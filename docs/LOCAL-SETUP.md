@@ -3,6 +3,11 @@
 A three-node kind cluster with the full observability stack, so alerts can be
 fired at `ingest-api` the same way they will be in production.
 
+The quickstart in the root README does not need any of this: the chart runs on
+a bare kind cluster with `k8s-events` as the only collector. This page is for
+the full loop (Prometheus rule → Alertmanager → webhook) and the Loki and
+Prometheus collectors. See also `deploy/README.md` for the agent and MCP.
+
 ## Prerequisites
 
 | Tool | Check | Install (Windows) |

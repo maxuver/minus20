@@ -213,8 +213,10 @@ NARRATIVE_PROMPT = (
     "timing, blast radius, how often the assistant was right).\n"
     "RECOMMENDATIONS: up to 3 items labelled P0 (this week), P1 (this month), P2 "
     "(when convenient), each one line, each tied to a figure above.\n"
-    "Accuracy of the assistant is known only from engineer_reviewed incidents; if "
-    "that is 0, say accuracy is not yet measured. Never call it accurate otherwise.\n"
+    "A hypothesis was produced for every analysed incident; what is unknown is "
+    "whether they were right. Accuracy is known only from engineer_reviewed "
+    "incidents; if that is 0, say that no incident has been reviewed yet. Never "
+    "say the assistant made no predictions, and never call it accurate otherwise.\n"
     "If the data is too thin to say anything, say so in one sentence."
 )
 

@@ -1,5 +1,10 @@
 # SentinelOps — Vision
 
+> Written 2026-07-28, before a line of code. Kept as the statement of intent.
+> What exists today, and how it is built, is in [ARCHITECTURE.md](ARCHITECTURE.md);
+> the decisions since are in [adr/](adr/). Where this document and those disagree,
+> the code and the ADRs are right. Section 8 lists what changed.
+
 ## 1. The pain
 
 The most expensive part of an incident is not the fix — it is the first 20–30 minutes of
@@ -62,13 +67,14 @@ We are not guessing at a trend; we are entering a confirmed one.
 
 ## 4. Positioning against prior art
 
-|                        | k8sgpt                  | HolmesGPT                     | SentinelOps                             |
-|------------------------|-------------------------|-------------------------------|-----------------------------------------|
-| Model of operation     | on-demand cluster scan  | autonomous agent loop         | event-driven: reacts to each alert      |
-| Context                | K8s resources           | many toolsets                 | logs + metrics + events around the alert |
-| History                | no                      | partially (SaaS)              | Postgres — incident dataset             |
-| Cost per alert         | —                       | unpredictable (agent iterates) | deterministic pipeline → predictable    |
-| Scope                  | CLI tool                | agent                         | full platform: IaC → GitOps → observability → AI |
+|                        | k8sgpt                  | HolmesGPT                     | AWS DevOps Agent (2026)            | SentinelOps                             |
+|------------------------|-------------------------|-------------------------------|------------------------------------|-----------------------------------------|
+| Model of operation     | on-demand cluster scan  | autonomous agent loop         | managed autonomous agent           | event-driven reflex + bounded on-demand agent |
+| Context                | K8s resources           | many toolsets                 | account topology, telemetry, code  | logs + metrics + events around the alert; memory of past incidents |
+| History                | no                      | partially (SaaS)              | in AWS                             | Postgres in your cluster — incident dataset with engineer verdicts |
+| Cost per alert         | —                       | unpredictable (agent iterates) | $0.0083 per agent-second          | deterministic pipeline → known in advance; $0 with a local model |
+| Data leaves the cluster | no                     | to the model vendor           | to CloudWatch/S3/Bedrock           | never, with the local backend |
+| Scope                  | CLI tool                | agent                         | AWS + integrations, 6 regions      | any Kubernetes, one `helm install` |
 
 The choice of a deterministic pipeline over an agent loop is a deliberate trade-off:
 predictable cost, bounded latency, auditable behaviour
@@ -85,8 +91,9 @@ SentinelOps treats this as a design constraint, not an afterthought:
   credentials and secret-shaped strings are masked in the collector output.
 - **Data minimization** — hard caps on log lines and context size; only the window
   around the alert timestamp is collected.
-- **Pluggable LLM backend** — `anthropic` (cloud) or `ollama` (fully local). A
-  data-sovereign deployment sends nothing outside the cluster and costs $0 per alert.
+- **Pluggable LLM backend** — `ollama` (fully local), any OpenAI-compatible API
+  (DeepSeek, Groq, Gemini, vLLM), or `anthropic`. A data-sovereign deployment
+  sends nothing outside the cluster and costs $0 per alert.
 - **Redacted-only persistence** with a configurable retention TTL.
 
 Details: [ADR-0002](adr/0002-llm-privacy-and-pluggable-backends.md).
@@ -108,7 +115,24 @@ These numbers are the project's résumé: each one can be demonstrated live.
 
 - **No auto-remediation.** Recommendations only. (The talk cited above put it best:
   the agent drafts, the engineer decides, the engineer gets the reprimand.)
-- **Not a k8sgpt/HolmesGPT replacement** — this is an end-to-end platform built to be
-  understood and operated by its author, layer by layer, not a product competing for
-  installs.
+- **No shell for the model.** The agent's tools are a closed, read-only set; a general
+  agent harness with shell access is not something to run inside someone's cluster.
 - **No multi-cluster federation** in scope for v1.
+- **No pre-deploy / release-readiness review.** Post-deploy operations only.
+
+## 8. What changed since this was written (2026-09-13)
+
+- The reflex pipeline shipped as described. An **on-demand agent** was added as a
+  second, separate process (ADR-0005): the agent-loop trade-off in §4 still holds
+  for the alert path, and the agent is bounded (tool calls, time, budget) and
+  holds no tool that can change anything.
+- **Memory** of past incidents with the engineer's verdict (pgvector, local
+  embeddings) and a weekly **incident review** (`/report`) were added; the
+  review format came from a real incident report for a production API.
+- The same tools are served over **MCP** to external agent CLIs.
+- **AWS DevOps Agent** (GA April 2026) confirmed the category with the same
+  pitch ("always-on autonomous on-call engineer"). SentinelOps is positioned
+  for where it cannot be used: data that must stay in the cluster, clusters not
+  on AWS, teams that need the price known in advance, open code.
+- Terraform for EKS was **applied for real** once and destroyed ([EKS-RUN.md](EKS-RUN.md)).
+- Measured accuracy is published, including where it fails ([BENCHMARKS.md](BENCHMARKS.md)).
