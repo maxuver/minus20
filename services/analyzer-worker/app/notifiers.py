@@ -18,6 +18,7 @@ from html import escape
 
 from .config import Settings, settings
 from .models import Incident, IncidentStatus
+from .redaction import redact
 
 _SEVERITY_ICON = {"critical": "🔴", "warning": "🟡", "info": "🔵"}
 
@@ -83,7 +84,7 @@ def format_message(incident: Incident) -> str:
         lines.append("")
         lines.append("⚠️ <b>AI analysis unavailable</b>")
         if incident.failure_reason:
-            lines.append(f"<code>{escape(incident.failure_reason[:200])}</code>")
+            lines.append(f"<code>{escape(redact(incident.failure_reason)[:240])}</code>")
         lines.append("<i>Raw alert delivered as usual.</i>")
 
     return "\n".join(lines)
@@ -147,7 +148,7 @@ def format_slack_blocks(incident: Incident) -> list[dict]:
         )
 
     else:
-        reason = esc(incident.failure_reason or "")[:200]
+        reason = esc(redact(incident.failure_reason or ""))[:240]
         tail = f"\n`{reason}`" if reason else ""
         blocks.append(
             _section(f"*AI analysis unavailable*{tail}\n_Raw alert delivered as usual._")

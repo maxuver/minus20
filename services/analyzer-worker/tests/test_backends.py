@@ -212,3 +212,35 @@ async def test_stub_backend_is_deterministic_and_free():
     assert r1.cost_usd == 0.0
     assert r1.hypothesis == r2.hypothesis
     assert r1.hypothesis.root_cause  # non-empty
+
+
+async def test_provider_http_error_is_described_by_status_and_body_not_url():
+    """The Gemini 404 that reached a phone said nothing useful; the body did."""
+    body = {"error": {"code": 404, "message": "This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.6-flash"}}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json=body)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://p/v1")
+    with pytest.raises(BackendError) as info:
+        await OpenAICompatibleBackend(Settings(openai_api_key="k"), client=client).analyze("prompt")
+    msg = str(info.value)
+    assert "HTTP 404 from provider" in msg
+    assert "gemini-3.6-flash" in msg  # the actionable part survived
+    assert "http://p" not in msg and "for url" not in msg  # the URL did not
+    assert "mozilla" not in msg
+    await client.aclose()
+
+
+def test_describe_strips_url_clauses_and_redacts():
+    from app.errors import describe
+
+    exc = RuntimeError(
+        "Client error '400 Bad Request' for url "
+        "'https://api.telegram.org/bot1890788154:AAHVJEmQlOanKaS9SWyRphHOCwWMp5YsETc/sendMessage'"
+        "\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"
+    )
+    out = describe(exc)
+    assert "AAHVJEmQlOanKaS9SWyRphHOCwWMp5YsETc" not in out
+    assert "for url" not in out and "mozilla" not in out
+    assert out.startswith("RuntimeError: Client error '400 Bad Request'")

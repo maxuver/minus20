@@ -21,6 +21,7 @@ import json
 import re
 
 from .config import Settings, settings
+from .errors import describe
 from .models import Hypothesis, LLMResult
 from .ports import BackendError
 
@@ -119,7 +120,7 @@ class AnthropicBackend:
                 extra_body={"temperature": 0},
             )
         except Exception as exc:  # network/API errors → graceful degradation
-            raise BackendError(f"anthropic call failed: {exc}") from exc
+            raise BackendError(f"anthropic call failed: {describe(exc)}") from exc
 
         if getattr(resp, "stop_reason", None) == "refusal":
             raise BackendError("anthropic refused the request")
@@ -178,7 +179,7 @@ class OllamaBackend:
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            raise BackendError(f"ollama call failed: {exc}") from exc
+            raise BackendError(f"ollama call failed: {describe(exc)}") from exc
         finally:
             if self._client is None:
                 await client.aclose()
@@ -238,7 +239,7 @@ class OpenAICompatibleBackend:
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            raise BackendError(f"openai-compatible call failed: {exc}") from exc
+            raise BackendError(f"openai-compatible call failed: {describe(exc)}") from exc
         finally:
             if self._client is None:
                 await client.aclose()

@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from ..config import Settings, settings
+from ..errors import describe
 from ..ports import BackendError
 
 
@@ -168,7 +169,7 @@ class OllamaChat:
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            raise BackendError(f"ollama chat failed: {exc}") from exc
+            raise BackendError(f"ollama chat failed: {describe(exc)}") from exc
         finally:
             if self._client is None:
                 await client.aclose()
@@ -207,7 +208,7 @@ class OllamaChat:
             resp.raise_for_status()
             return (resp.json().get("message") or {}).get("content") or ""
         except Exception as exc:
-            raise BackendError(f"ollama vision call failed: {exc}") from exc
+            raise BackendError(f"ollama vision call failed: {describe(exc)}") from exc
         finally:
             if self._client is None:
                 await client.aclose()
@@ -245,7 +246,7 @@ class OpenAIChat:
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            raise BackendError(f"openai-compatible chat failed: {exc}") from exc
+            raise BackendError(f"openai-compatible chat failed: {describe(exc)}") from exc
         finally:
             if self._client is None:
                 await client.aclose()
@@ -307,7 +308,7 @@ class OpenAIChat:
             resp.raise_for_status()
             choices = resp.json().get("choices") or []
         except Exception as exc:
-            raise BackendError(f"openai-compatible vision call failed: {exc}") from exc
+            raise BackendError(f"openai-compatible vision call failed: {describe(exc)}") from exc
         finally:
             if self._client is None:
                 await client.aclose()
