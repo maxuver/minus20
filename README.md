@@ -148,7 +148,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Collectors — Kubernetes events, Prometheus, Loki | ✅ |
 | LLM backends — local Ollama, any OpenAI-compatible API (DeepSeek, Groq, vLLM…), Anthropic, offline stub | ✅ |
 | Delivery — Slack, Telegram | ✅ |
-| Incident history — Postgres | ✅ |
+| Incident history — Postgres, with the redacted context each hypothesis was based on (audit trail) | ✅ |
 | Read-only web UI for the incident history | ✅ |
 | Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report`, screenshots via a local vision model | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
 | MCP server — the same read-only tools for Gemini CLI, Claude Code, Cursor | ✅ |

@@ -226,8 +226,8 @@ on the incident and indexed, so the next similar incident is answered with
 improves with use.
 
 **What it can and cannot do.** Its tools are `recent_incidents`,
-`incident_details`, `search_memory`, `k8s_events`, `pod_logs`, `pod_metrics`
-and `deploy_history`. Every one observes. There is no shell, no `kubectl`, no
+`incident_details`, `search_memory`, `k8s_events`, `pod_logs`, `pod_metrics`,
+`deploy_history` and `node_status`. Every one observes. There is no shell, no `kubectl`, no
 tool that changes anything, and the set is closed: adding one is a code
 review, not a plugin. Every question is bounded by `agent.maxToolCalls`,
 `agent.timeoutSeconds` and `agent.dailyBudgetUsd`.

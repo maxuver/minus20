@@ -146,7 +146,7 @@ async def incident_details(ctx: ToolContext, incident_id: str) -> str:
         row = await conn.fetchrow(
             "SELECT id, alertname, namespace, severity, status, root_cause, confidence, "
             "blast_radius, evidence, disproof, next_steps, backend, created_at, "
-            "verdict, resolution FROM incidents WHERE id LIKE $1 "
+            "verdict, resolution, context FROM incidents WHERE id LIKE $1 "
             "ORDER BY created_at DESC LIMIT 1",
             prefix + "%",
         )
@@ -154,6 +154,12 @@ async def incident_details(ctx: ToolContext, incident_id: str) -> str:
         return f"no incident with id starting {prefix}"
     d = dict(row)
     d["created_at"] = d["created_at"].isoformat() if d["created_at"] else None
+    # The audit trail: what the model was shown. Capped so one incident cannot
+    # crowd out the conversation; the full text stays in the database.
+    ctx = d.pop("context", None) or ""
+    if len(ctx) > 2_000:
+        ctx = ctx[:2_000] + "\n… (truncated; full context is stored with the incident)"
+    d["context_shown_to_model"] = ctx or "(no context recorded)"
     return json.dumps(d, ensure_ascii=False, indent=1)
 
 
@@ -220,6 +226,47 @@ async def pod_logs(
         if text and text.strip():
             out.append(("--- previous container (before the last crash)\n" if previous else "") + text.strip())
     return "\n".join(out) or f"{namespace}/{pod} has produced no log output"
+
+
+async def node_status(ctx: ToolContext) -> str:
+    """Node conditions and recent node events, read-only through the API.
+
+    The half of node-level insight that needs no privileged DaemonSet and no
+    SSM: MemoryPressure, DiskPressure, PIDPressure, NotReady, and the
+    Warning events kubelet writes about a node (eviction, OOM-kills at node
+    level, image GC). Needs get/list on nodes; if RBAC is namespace-scoped
+    the tool says so instead of failing.
+    """
+    api = await ctx.core_api()
+    try:
+        nodes = await api.list_node()
+    except Exception as exc:  # noqa: BLE001 - usually RBAC in namespaced mode
+        return f"node status unavailable: {exc}"
+    lines = []
+    for node in nodes.items:
+        name = node.metadata.name
+        conds = {c.type: c.status for c in (node.status.conditions or [])}
+        ready = conds.get("Ready", "Unknown")
+        pressure = [t for t in ("MemoryPressure", "DiskPressure", "PIDPressure", "NetworkUnavailable") if conds.get(t) == "True"]
+        alloc = node.status.allocatable or {}
+        info = getattr(node.status, "node_info", None)
+        version = getattr(info, "kubelet_version", "") if info else ""
+        line = f"{name}: Ready={ready}"
+        if pressure:
+            line += " PRESSURE=" + ",".join(pressure)
+        line += f" allocatable cpu={alloc.get('cpu', '?')} memory={alloc.get('memory', '?')} pods={alloc.get('pods', '?')}"
+        if version:
+            line += f" kubelet={version}"
+        lines.append(line)
+    try:
+        events = await api.list_event_for_all_namespaces(field_selector="involvedObject.kind=Node")
+        warnings = [e for e in events.items if e.type == "Warning"]
+        warnings.sort(key=lambda e: (e.last_timestamp or e.event_time or datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+        for e in warnings[: ctx.cfg.k8s_max_events]:
+            lines.append(f"event {e.reason} node/{getattr(e.involved_object, 'name', '')}: {e.message}")
+    except Exception as exc:  # noqa: BLE001 - events are a bonus here
+        lines.append(f"(node events unavailable: {exc})")
+    return "\n".join(lines) or "no nodes visible"
 
 
 async def deploy_history(ctx: ToolContext, namespace: str, hours: int = 24) -> str:
@@ -331,6 +378,14 @@ TOOLS: dict[str, Tool] = {
                 "required": ["namespace"],
             },
             pod_logs,
+        ),
+        Tool(
+            "node_status",
+            "Every node's Ready state, memory/disk/PID pressure and allocatable resources, "
+            "plus recent Warning events about nodes. Check this when pods are Pending, "
+            "evicted, or failing across many namespaces at once.",
+            {"type": "object", "properties": {}},
+            node_status,
         ),
         Tool(
             "deploy_history",

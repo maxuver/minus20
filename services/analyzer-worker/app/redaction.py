@@ -29,6 +29,10 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE),
         "Bearer [REDACTED_TOKEN]",
     ),
+    # Telegram bot tokens (<bot id>:<35 chars>). httpx puts the full request URL
+    # into every exception message, and the URL carries the token. No leading
+    # word boundary: in that URL the digits are glued to "bot".
+    (re.compile(r"\d{8,12}:[A-Za-z0-9_-]{30,}\b"), "[REDACTED_BOT_TOKEN]"),
     # AWS access key id and secret access key.
     (re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "[REDACTED_AWS_KEY]"),
     (
@@ -40,9 +44,16 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
         "[REDACTED_EMAIL]",
     ),
-    # IPv6 (loose) then IPv4. IPv6 first so it isn't partially eaten by IPv4.
+    # IPv6 then IPv4. IPv6 first so it isn't partially eaten by IPv4. Either
+    # the full eight groups, or a compressed form containing "::". The earlier
+    # "any 3-8 colon-separated hex groups" rule also matched clock times like
+    # 20:59:12 once the log formatter started redacting whole lines.
     (
-        re.compile(r"\b(?:[0-9A-Fa-f]{1,4}:){2,7}[0-9A-Fa-f]{1,4}\b"),
+        re.compile(
+            r"\b(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}\b"
+            r"|(?<![:\w])(?:[0-9A-Fa-f]{1,4}:){1,6}:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,5})?(?![:\w])"
+            r"|(?<![:\w])::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})(?![:\w])"
+        ),
         "[REDACTED_IPV6]",
     ),
     (

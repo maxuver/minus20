@@ -48,6 +48,9 @@ _MIGRATIONS = (
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS verdict TEXT",
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolution TEXT",
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ",
+    # Audit trail: the redacted context the model was shown (ADR-0002 keeps
+    # it redacted; a regulated team needs to see what the model saw).
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS context TEXT",
 )
 
 _INDEXES = (
@@ -59,8 +62,8 @@ _INSERT = """
 INSERT INTO incidents (
     id, fingerprint, alertname, namespace, severity, status,
     root_cause, confidence, blast_radius, evidence, disproof, next_steps,
-    backend, cost_usd, latency_ms, failure_reason, created_at
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+    backend, cost_usd, latency_ms, failure_reason, created_at, context
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 ON CONFLICT (id) DO NOTHING
 """
 
@@ -99,6 +102,15 @@ class PostgresStore:
             self._pool = await asyncpg.create_pool(self._dsn)
         return self._pool
 
+    async def ensure_schema(self) -> None:
+        """Create or migrate the table now rather than on the first save, so a
+        read-only consumer (the web UI) never meets a column that a not-yet-
+        received incident would have added."""
+        pool = await self._get_pool()
+        async with pool.acquire() as conn:
+            await ensure_incidents_schema(conn)
+        self._schema_ready = True
+
     async def save(self, incident: Incident) -> None:
         pool = await self._get_pool()
         h = incident.hypothesis
@@ -125,6 +137,7 @@ class PostgresStore:
                 incident.latency_ms,
                 incident.failure_reason,
                 incident.created_at,
+                incident.context or None,
             )
 
 

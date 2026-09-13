@@ -49,13 +49,9 @@ async def build() -> TelegramBot:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=settings.log_level.upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    # httpx logs full request URLs at INFO, and the Telegram URL carries the bot token.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    from ..logsafe import configure_logging
+
+    configure_logging(settings.log_level)
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         logger.error("SENTINELOPS_TELEGRAM_BOT_TOKEN and SENTINELOPS_TELEGRAM_CHAT_ID are required")
         sys.exit(2)

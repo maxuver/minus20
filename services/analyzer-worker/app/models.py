@@ -127,4 +127,7 @@ class Incident(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: int = 0
+    # Exactly what the model was shown, after redaction: the audit trail for
+    # "what did it see when it said that". Empty when analysis never ran.
+    context: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

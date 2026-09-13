@@ -1,0 +1,45 @@
+{
+  "name": "pending-ip-exhaustion",
+  "why_hard": "Pods are Pending and the node looks healthy: plenty of CPU and memory, no pressure conditions. The obvious guesses are a scheduler problem or resource limits. The real cause is that the VPC CNI has run out of pod IPs on the node's ENIs after a scale-up, which shows only as a sandbox-creation failure in the events, not in any metric about the node.",
+  "expected_keywords": ["ip", "eni", "subnet", "cidr", "address"],
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "KubePodNotReady",
+      "namespace": "checkout",
+      "pod": "checkout-web-5b8c7d9f6-q2m8z",
+      "container": "checkout-web",
+      "severity": "warning"
+    },
+    "annotations": {
+      "description": "Pod checkout/checkout-web has been in a non-ready state for longer than 15 minutes.",
+      "summary": "Pod has been in a non-ready state for more than 15 minutes."
+    },
+    "startsAt": "2026-09-13T08:41:00Z",
+    "fingerprint": "h6c7d8e9f0a1b2c3"
+  },
+  "context": {
+    "k8s_events": [
+      "Warning FailedCreatePodSandBox pod/checkout-web-5b8c7d9f6-q2m8z x41: Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"3f1a…\": plugin type=\"aws-cni\" name=\"aws-cni\" failed (add): add cmd: failed to assign an IP address to container",
+      "Warning FailedCreatePodSandBox pod/checkout-web-5b8c7d9f6-h7k1p x39: Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox: plugin type=\"aws-cni\" failed (add): add cmd: failed to assign an IP address to container",
+      "Normal Scheduled pod/checkout-web-5b8c7d9f6-q2m8z: Successfully assigned checkout/checkout-web-5b8c7d9f6-q2m8z to ip-10-0-2-117.eu-central-1.compute.internal",
+      "Normal ScalingReplicaSet deployment/checkout-web: Scaled up replica set checkout-web-5b8c7d9f6 from 12 to 60"
+    ],
+    "metrics": [
+      "kube_pod_status_phase{namespace=\"checkout\",pod=\"checkout-web-5b8c7d9f6-q2m8z\",phase=\"Pending\"} = 1",
+      "kube_node_status_condition{node=\"ip-10-0-2-117.eu-central-1.compute.internal\",condition=\"Ready\",status=\"true\"} = 1",
+      "kube_node_status_condition{node=\"ip-10-0-2-117.eu-central-1.compute.internal\",condition=\"MemoryPressure\",status=\"true\"} = 0",
+      "kube_node_status_allocatable{node=\"ip-10-0-2-117.eu-central-1.compute.internal\",resource=\"cpu\"} = 4",
+      "kube_node_status_allocatable{node=\"ip-10-0-2-117.eu-central-1.compute.internal\",resource=\"memory\"} = 16106127360",
+      "node_memory_MemAvailable_bytes{instance=\"ip-10-0-2-117\"} = 11274289152",
+      "awscni_assigned_ip_addresses{instance=\"ip-10-0-2-117\"} = 58",
+      "awscni_total_ip_addresses{instance=\"ip-10-0-2-117\"} = 58",
+      "awscni_ipamd_error_count{instance=\"ip-10-0-2-117\",fn=\"increaseIPPoolFailed\"} = 217"
+    ],
+    "log_lines": [
+      "aws-node: ipamd: Failed to increase pool size: allocate IP addresses: InsufficientFreeAddressesInSubnet: The specified subnet does not have enough free addresses to satisfy the request",
+      "aws-node: ipamd: datastore: no available IP/Prefix addresses",
+      "checkout-web: (no application logs: the container never started)"
+    ]
+  }
+}

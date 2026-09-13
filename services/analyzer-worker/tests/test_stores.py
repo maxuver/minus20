@@ -76,6 +76,7 @@ async def test_postgres_store_creates_schema_then_inserts():  # CC-29
     assert ["OOMKilling event x3"] in args
     assert "check memory below limit at alert time" in args
     assert ["raise the limit"] in args
+    assert len(args) == 18  # …and the redacted context the model saw (audit trail)
 
 
 async def test_postgres_store_creates_schema_only_once():

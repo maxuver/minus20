@@ -59,6 +59,9 @@
     font-size:.6875rem; text-transform:uppercase; letter-spacing:.08em;
     color:var(--dim); margin:1.1rem 0 .35rem; font-weight:600;
   }
+  details.audit { margin-top:12px; }
+  details.audit summary { cursor:pointer; color:var(--dim); }
+  details.audit pre { white-space:pre-wrap; max-height:24em; overflow:auto; margin:8px 0 0; }
   code, .mono {
     font-family: "JetBrains Mono", ui-monospace, monospace; font-size:.8125rem;
   }
@@ -150,6 +153,18 @@
       {% if i.failure_reason %}
         <h3>Why analysis did not run</h3>
         <code>{{ i.failure_reason }}</code>
+      {% endif %}
+
+      {% if i.verdict %}
+        <h3>Engineer's verdict</h3>
+        <div>{{ i.verdict }}{% if i.resolution %}: {{ i.resolution }}{% endif %}</div>
+      {% endif %}
+
+      {% if i.context %}
+        <details class="audit">
+          <summary>What the model was shown (redacted)</summary>
+          <pre class="mono">{{ i.context }}</pre>
+        </details>
       {% endif %}
 
       <div class="footer-line mono">

@@ -15,7 +15,7 @@ from .config import Settings, settings
 _LIST = """
 SELECT id, alertname, namespace, severity, status, root_cause, confidence,
        blast_radius, evidence, disproof, next_steps, backend, cost_usd,
-       latency_ms, failure_reason, created_at
+       latency_ms, failure_reason, created_at, verdict, resolution, context
 FROM incidents
 WHERE ($1::text IS NULL OR namespace = $1)
   AND ($2::text IS NULL OR status = $2)

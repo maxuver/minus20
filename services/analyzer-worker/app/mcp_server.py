@@ -111,6 +111,9 @@ def build_server(ctx: ToolContext | None = None, cfg: Settings = settings) -> MC
     async def deploy_history(namespace: str, hours: int = 24) -> str:
         return await tools.run(state.get(), "deploy_history", {"namespace": namespace, "hours": hours})
 
+    async def node_status() -> str:
+        return await tools.run(state.get(), "node_status", {})
+
     wrappers = {
         "recent_incidents": recent_incidents,
         "incident_details": incident_details,
@@ -119,6 +122,7 @@ def build_server(ctx: ToolContext | None = None, cfg: Settings = settings) -> MC
         "pod_metrics": pod_metrics,
         "pod_logs": pod_logs,
         "deploy_history": deploy_history,
+        "node_status": node_status,
     }
     # The registry is the source of truth: a tool without a wrapper is a bug,
     # and a wrapper without a registry entry would be a tool nobody reviewed.
@@ -131,13 +135,10 @@ def build_server(ctx: ToolContext | None = None, cfg: Settings = settings) -> MC
 
 
 def main() -> None:  # pragma: no cover - entrypoint
+    from .logsafe import configure_logging
+
     # stdio carries the protocol on stdout, so logs must go to stderr.
-    logging.basicConfig(
-        level=settings.log_level.upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        stream=sys.stderr,
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    configure_logging(settings.log_level, stream=sys.stderr)
     server = build_server()
     if settings.mcp_transport.lower() == "http":
         # In-cluster only: the chart exposes it as a ClusterIP Service, never outside.

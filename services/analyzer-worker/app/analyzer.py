@@ -46,7 +46,7 @@ class Analyzer:
         self._timeout = llm_timeout_seconds
         self._dedup = deduplicator
 
-    async def analyze(self, alert: StreamAlert) -> Incident:
+    async def analyze(self, alert: StreamAlert, *, skip_dedup: bool = False) -> Incident:
         incident = Incident(
             fingerprint=alert.fingerprint,
             alertname=alert.alertname,
@@ -58,7 +58,10 @@ class Analyzer:
 
         # Suppress a repeat of an alert already handled in this window. Checked
         # first, so a duplicate costs no collector calls and no LLM spend.
-        if self._dedup is not None and await self._dedup.is_duplicate(alert):
+        # A message reclaimed from a consumer that died mid-analysis has already
+        # been marked in the dedup window by that consumer; it must still be
+        # analysed, or the alert is lost for the whole window.
+        if not skip_dedup and self._dedup is not None and await self._dedup.is_duplicate(alert):
             incident.status = IncidentStatus.DUPLICATE_SUPPRESSED
             logger.info("suppressed duplicate alert=%s fp=%s", alert.alertname, alert.fingerprint)
             return incident
@@ -66,6 +69,7 @@ class Analyzer:
         # Collect and redact BEFORE anything leaves the process.
         raw_context = await self._collector.collect(alert)
         context = redact_bundle(raw_context)
+        incident.context = context.render()  # redacted; stored with the incident
 
         if not await self._budget.has_budget():
             incident.status = IncidentStatus.BUDGET_EXCEEDED

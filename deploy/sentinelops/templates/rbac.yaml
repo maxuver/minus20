@@ -27,6 +27,11 @@ rules:
   - apiGroups: ["apps"]
     resources: ["replicasets", "deployments"]
     verbs: ["get", "list"]
+  # Nodes are cluster-scoped, so only the cluster-wide role can read them;
+  # the agent's node_status tool degrades to "unavailable" otherwise.
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

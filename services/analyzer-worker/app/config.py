@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # A message that keeps failing is parked in the dead-letter stream after this
     # many delivery attempts, so a poison message can never wedge the loop (ADR-0003).
     max_delivery_attempts: int = 5
+    # A message delivered to a consumer that died before acknowledging is taken
+    # over once it has been idle this long (XAUTOCLAIM). Longer than one full
+    # analysis, so a slow-but-alive consumer is never robbed of its message.
+    reclaim_idle_ms: int = 120_000
 
     # --- context collectors (comma-separated: stub, k8s-events, prometheus, loki) ---
     # Fixed in config, not chosen by the model at runtime (ADR-0001).

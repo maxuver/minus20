@@ -11,6 +11,7 @@ told to answer with what it has rather than fail silently.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -135,6 +136,7 @@ class Agent:
         messages.append({"role": "user", "content": question})
         answer = AgentAnswer(text="")
         schemas = tools.schemas()
+        seen: dict[str, str] = {}  # (tool, args) → result; small models re-ask the same thing
 
         for _round in range(self._cfg.agent_max_tool_calls + 1):
             turn = await self._chat.chat(messages, schemas)
@@ -157,7 +159,19 @@ class Agent:
             # checked before the model may request more.
             for call in turn.tool_calls:
                 answer.tool_calls.append(call.name)
-                result = await tools.run(self._ctx, call.name, call.arguments)
+                key = call.name + json.dumps(call.arguments, sort_keys=True)
+                if key in seen:
+                    # Seen live: k8s_events called four times with the same
+                    # arguments in one question, minutes each on CPU. The
+                    # observation cannot have changed enough to matter.
+                    result = (
+                        "You already called this tool with these exact arguments; the "
+                        "result is above and has not changed. Use it, or call a different "
+                        "tool, or answer now."
+                    )
+                else:
+                    result = await tools.run(self._ctx, call.name, call.arguments)
+                    seen[key] = result
                 logger.info("tool %s(%s) → %d chars", call.name, call.arguments, len(result))
                 messages.append(tool_message(call, result))
             if len(answer.tool_calls) >= self._cfg.agent_max_tool_calls:

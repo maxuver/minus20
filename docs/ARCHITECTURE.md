@@ -73,8 +73,14 @@ second.
 4. One structured model call produces a hypothesis with evidence, the cheapest
    disproof, blast radius and next steps (ADR-0004). The context is framed as
    untrusted data; the model holds no tools on this path.
-5. The redacted incident is stored, the message is delivered, the cost is
-   charged to the daily budget. Failure at any step still delivers the alert.
+5. The redacted incident is stored **together with the exact redacted context
+   the model was shown** (the audit trail: what did it see when it said that),
+   the message is delivered, the cost is charged to the daily budget. Failure
+   at any step still delivers the alert.
+6. A message read by a worker that dies mid-analysis is reclaimed by the next
+   worker (`XAUTOCLAIM` after an idle threshold) and analysed, bypassing the
+   dedup key the dead worker already set. Every log line passes through the
+   redactor before it is written, exception text included.
 
 With the Ollama backend and local embeddings, no byte of log, metric or
 event leaves the cluster. That is the difference between "we redact" and
@@ -85,7 +91,7 @@ event leaves the cluster. That is the difference between "we redact" and
 Model output is never executed. The worker's model has no tools. The agent's
 tools are a closed registry of read-only observations (`app/agent/tools.py`);
 adding one is a code review of its verbs. RBAC grants get/list on events,
-pods, pods/log, replicasets and deployments, and nothing with a write verb.
+pods, pods/log, nodes, replicasets and deployments, and nothing with a write verb.
 Credentials live in Secrets, never in values or the ConfigMap; the Telegram
 token is kept out of logs by pinning httpx to WARNING. A prompt injection in a
 log line can produce a wrong sentence in chat; it cannot produce an action.

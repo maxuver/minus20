@@ -156,3 +156,25 @@ async def test_budget_only_charged_on_success(alert):
     await az.analyze(alert)
     # A failed call must not consume budget.
     assert await budget.has_budget() is True
+
+
+
+async def test_incident_records_the_redacted_context_the_model_saw():
+    """Audit trail: what did the model see when it said that (ADR-0002 keeps it redacted)."""
+    from app.analyzer import Analyzer
+    from app.backends import StubBackend
+    from app.budget import InMemoryBudget
+    from app.models import ContextBundle, StreamAlert
+    from app.notifiers import StubNotifier
+    from app.stores import InMemoryStore
+
+    class Leaky:
+        async def collect(self, alert):
+            return ContextBundle(log_lines=["auth failed for admin@corp.example from 10.1.2.3"])
+
+    store = InMemoryStore()
+    analyzer = Analyzer(collector=Leaky(), backend=StubBackend(), notifier=StubNotifier(), store=store, budget=InMemoryBudget(1.0))
+    inc = await analyzer.analyze(StreamAlert(labels={"alertname": "X", "namespace": "n"}))
+    assert "auth failed" in inc.context
+    assert "admin@corp.example" not in inc.context and "10.1.2.3" not in inc.context
+    assert store.saved[0].context == inc.context

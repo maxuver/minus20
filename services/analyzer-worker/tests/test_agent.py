@@ -164,6 +164,7 @@ def _incident(**over):
         "verdict": None,
         "resolution": None,
         "resolved_at": None,
+        "context": "",
     }
     base.update(over)
     return base
@@ -187,6 +188,7 @@ def test_tool_registry_is_closed_and_read_only():
         "pod_metrics",
         "pod_logs",
         "deploy_history",
+        "node_status",
     }
     # No tool name even hints at mutation; and every schema is a function schema.
     for name, tool in tools.TOOLS.items():
@@ -264,6 +266,58 @@ async def test_pod_logs_falls_back_to_the_kubernetes_api_without_loki():
     assert "name the pod" in await tools.run(ctx, "pod_logs", {"namespace": "sentinelops"})
 
 
+async def test_node_status_reports_pressure_and_node_warnings():
+    def node(name, ready="True", **pressure):
+        conds = [SimpleNamespace(type="Ready", status=ready)]
+        conds += [SimpleNamespace(type=k, status="True" if v else "False") for k, v in pressure.items()]
+        return SimpleNamespace(
+            metadata=SimpleNamespace(name=name),
+            status=SimpleNamespace(
+                conditions=conds,
+                allocatable={"cpu": "2", "memory": "3600Mi", "pods": "11"},
+                node_info=SimpleNamespace(kubelet_version="v1.36.3"),
+            ),
+        )
+
+    class Core:
+        async def list_node(self):
+            return SimpleNamespace(items=[node("n1"), node("n2", MemoryPressure=True, DiskPressure=True)])
+
+        async def list_event_for_all_namespaces(self, field_selector):
+            assert field_selector == "involvedObject.kind=Node"
+            return SimpleNamespace(
+                items=[
+                    SimpleNamespace(type="Warning", reason="SystemOOM", message="System OOM encountered, victim process: java",
+                                    involved_object=SimpleNamespace(name="n2"), last_timestamp=None, event_time=None),
+                    SimpleNamespace(type="Normal", reason="Starting", message="Starting kubelet.",
+                                    involved_object=SimpleNamespace(name="n1"), last_timestamp=None, event_time=None),
+                ]
+            )
+
+    out = await tools.run(tools.ToolContext(cfg=_cfg(), k8s_api=Core()), "node_status", {})
+    assert "n1: Ready=True" in out and "PRESSURE" not in out.split("\n")[0]
+    assert "n2: Ready=True PRESSURE=MemoryPressure,DiskPressure" in out
+    assert "kubelet=v1.36.3" in out
+    assert "event SystemOOM node/n2" in out
+    assert "Starting kubelet" not in out  # only warnings
+
+
+async def test_node_status_degrades_when_nodes_are_not_readable():
+    class Core:
+        async def list_node(self):
+            raise RuntimeError("nodes is forbidden: User cannot list resource")
+
+    out = await tools.run(tools.ToolContext(cfg=_cfg(), k8s_api=Core()), "node_status", {})
+    assert out.startswith("node status unavailable")
+
+
+async def test_incident_details_includes_the_context_the_model_saw():
+    pool = FakePool(incidents=[_incident(context="## Kubernetes events\nWarning BackOff pod/x: Back-off " + "y" * 3000)])
+    out = await tools.run(tools.ToolContext(cfg=_cfg(), pool=pool), "incident_details", {"incident_id": "abcdef12"})
+    assert '"context_shown_to_model"' in out
+    assert "truncated" in out  # capped for chat, full text stays in the database
+
+
 # ---- loop (CC-33, CC-34, CC-35) -----------------------------------------
 
 
@@ -332,6 +386,33 @@ async def test_every_requested_call_gets_a_result_even_past_the_bound():
     tool_msgs = [m for m in chat.requests[-1][0] if m["role"] == "tool"]
     assert len(tool_msgs) == 4  # all four answered, none dangling
     assert answer.truncated
+
+
+async def test_loop_does_not_rerun_an_identical_tool_call():
+    """Seen live: the same k8s_events(namespace=x) four times in one question."""
+    same = ToolCall(name="recent_incidents", arguments={"hours": 1})
+    chat = FakeChat(
+        [
+            ChatTurn(tool_calls=[ToolCall(name="recent_incidents", arguments={"hours": 1})]),
+            ChatTurn(tool_calls=[ToolCall(name="recent_incidents", arguments={"hours": 1})]),
+            ChatTurn(content="done"),
+        ]
+    )
+    pool = FakePool(incidents=[_incident()])
+    calls = {"n": 0}
+    orig_fetch = pool.conn.fetch
+
+    async def counting_fetch(sql, *args):
+        calls["n"] += 1
+        return await orig_fetch(sql, *args)
+
+    pool.conn.fetch = counting_fetch
+    agent = Agent(chat, tools.ToolContext(cfg=_cfg(), pool=pool), InMemoryBudget(1.0), _cfg())
+    await agent.ask("q")
+    assert calls["n"] == 1  # the database was asked once
+    second_result = [m for m in chat.requests[-1][0] if m["role"] == "tool"][1]["content"]
+    assert "already called this tool" in second_result
+    assert same.name == "recent_incidents"
 
 
 async def test_budget_exhaustion_skips_the_model():

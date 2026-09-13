@@ -30,9 +30,11 @@ class StubAnalyzer:
     def __init__(self, raises=False):
         self.raises = raises
         self.calls = 0
+        self.skip_dedup_seen: list[bool] = []
 
-    async def analyze(self, alert):
+    async def analyze(self, alert, *, skip_dedup=False):
         self.calls += 1
+        self.skip_dedup_seen.append(skip_dedup)
         if self.raises:
             raise RuntimeError("processing blew up")
 
@@ -103,3 +105,39 @@ async def test_process_status_transitions(rds, cfg, raw_payload):
 
     last = await worker.process("2-0", {"payload": payload, "_attempts": "1"})
     assert last == "dead:attempts"
+
+
+async def test_message_left_pending_by_a_dead_consumer_is_reclaimed(rds, raw_payload):
+    """The 2026-09-13 bug: an alert read by a pod killed mid-analysis stayed
+    pending forever, because '>' only returns new entries."""
+    cfg = Settings(block_ms=50, reclaim_idle_ms=0)  # idle threshold 0 so the test needs no sleep
+    # A previous consumer reads the message and dies before acknowledging.
+    dead = Worker(rds, StubAnalyzer(), Settings(consumer_name="analyzer-dead", block_ms=50))
+    await dead.ensure_group()
+    await rds.xadd(cfg.alerts_stream, {"payload": json.dumps(raw_payload)})
+    await rds.xreadgroup(cfg.consumer_group, "analyzer-dead", {cfg.alerts_stream: ">"}, count=1)
+    assert await _pending_count(rds, cfg) == 1
+
+    # The replacement pod: '>' alone would never see it.
+    analyzer = StubAnalyzer()
+    worker = Worker(rds, analyzer, cfg)
+    handled = await worker.run_once()
+
+    assert handled == 1
+    assert analyzer.calls == 1
+    assert analyzer.skip_dedup_seen == [True]  # the dead consumer already set the dedup key
+    assert await _pending_count(rds, cfg) == 0  # processed and acknowledged
+
+
+async def test_reclaim_respects_the_idle_threshold(rds, raw_payload):
+    """A slow-but-alive consumer keeps its message."""
+    cfg = Settings(block_ms=50, reclaim_idle_ms=60_000)
+    other = Worker(rds, StubAnalyzer(), Settings(consumer_name="analyzer-slow", block_ms=50))
+    await other.ensure_group()
+    await rds.xadd(cfg.alerts_stream, {"payload": json.dumps(raw_payload)})
+    await rds.xreadgroup(cfg.consumer_group, "analyzer-slow", {cfg.alerts_stream: ">"}, count=1)
+
+    analyzer = StubAnalyzer()
+    assert await Worker(rds, analyzer, cfg).reclaim() == 0
+    assert analyzer.calls == 0
+    assert await _pending_count(rds, cfg) == 1  # still theirs
