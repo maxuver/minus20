@@ -63,7 +63,8 @@ kubectl -n sentinelops logs -f deploy/so-analyzer-worker
 ```
 
 Full deployment guide, including the monitoring stack and the autonomous
-Alertmanager loop: [`deploy/README.md`](deploy/README.md).
+Alertmanager loop: [`deploy/README.md`](deploy/README.md). A scripted
+walkthrough for a first look or a screen recording: [`docs/DEMO.md`](docs/DEMO.md).
 
 ### Option B — docker compose, no cluster
 
@@ -191,6 +192,7 @@ infra/terraform/     AWS VPC + EKS (applied once for real, see docs/EKS-RUN.md)
 kind/                local cluster and monitoring stack config
 docs/
   ARCHITECTURE.md    the map: two processes, ports and adapters, what never leaves
+  DEMO.md            25-minute walkthrough from an empty cluster to a hypothesis in chat
   VISION.md          why this project exists, in depth
   adr/               architecture decision records
 ```
