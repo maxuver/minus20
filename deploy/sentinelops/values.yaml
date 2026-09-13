@@ -80,6 +80,11 @@ agent:
   # Local embeddings through the same Ollama as the LLM; dimension must match.
   embedModel: nomic-embed-text
   embedDim: 768
+  # Screenshots sent to the bot are transcribed by this vision model first
+  # (ollama pull qwen2.5vl:7b). With the openai provider, leave empty to use
+  # the chat model, or name a vision-capable one (e.g. gemini-2.5-flash).
+  visionModel: qwen2.5vl:7b
+  openaiVisionModel: ""
   # Runbooks to index into memory: filename -> markdown. Example:
   #   runbooks:
   #     dns-networkpolicy.md: |

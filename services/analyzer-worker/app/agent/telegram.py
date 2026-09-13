@@ -11,12 +11,15 @@ read-only on someone else's cluster is still a leak.
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+import time
 from dataclasses import dataclass
 from html import escape
 from typing import Any
 
 from ..config import Settings
+from ..redaction import redact
 from . import report
 from .chat import ChatBackend
 from .loop import Agent
@@ -29,7 +32,8 @@ HELP = (
     "Ask me in plain words, for example:\n"
     "  why did billing-api crash?\n"
     "  what changed in payments in the last 6 hours?\n"
-    "  has this happened before?\n\n"
+    "  has this happened before?\n"
+    "Or send a screenshot of the error; add a question as its caption.\n\n"
     "Commands:\n"
     "  /report [days]        incident review for the last N days (default 7)\n"
     "  /ok <id> [note]       the hypothesis for incident #id was right\n"
@@ -41,6 +45,15 @@ HELP = (
 
 MAX_MESSAGE = 3_900  # Telegram caps at 4096; leave room for tags
 HISTORY_TURNS = 3  # user+assistant pairs kept per chat for follow-up questions
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+NO_ARG_COMMANDS = ("/start", "/help", "/status", "/index")
+
+TRANSCRIBE_PROMPT = (
+    "This is a screenshot an on-call engineer sent about a production problem. "
+    "Transcribe every line of text in it exactly, including error messages, "
+    "pod names, namespaces, status columns and timestamps. Then, in one sentence, "
+    "say what error it shows. Do not guess at causes."
+)
 
 
 @dataclass
@@ -125,23 +138,99 @@ class TelegramBot:
     # --- dispatch ------------------------------------------------------------
 
     async def handle(self, update: dict) -> Reply | None:
-        """Handle one update; returns the reply (also sent), for tests."""
+        """Handle one update; returns the last reply (all are sent), for tests."""
         msg = update.get("message") or {}
         chat_id = str((msg.get("chat") or {}).get("id", ""))
-        text = (msg.get("text") or "").strip()
-        if not chat_id or not text:
+        text = (msg.get("text") or msg.get("caption") or "").strip()
+        image = self._image_ref(msg)
+        if not chat_id or (not text and image is None):
             return None
         if chat_id not in self._allowed:
             logger.info("ignored message from chat %s (not allow-listed)", chat_id)
             return None
         await self._typing(chat_id)
+        started = time.monotonic()
+        reply: Reply | None = None
         try:
-            reply = await self.dispatch(chat_id, text)
+            if image is not None:
+                reply = await self._handle_image(chat_id, image, text)
+            else:
+                # One message may carry several requests ("/status" then a
+                # question on the next line, or "/status why is x down?").
+                # Each is answered; before, only the first command was.
+                for segment in self._segments(text):
+                    reply = await self.dispatch(chat_id, segment)
+                    await self._send(chat_id, reply)
+                logger.info(
+                    "chat %s: %s → %d segment(s) in %.1fs",
+                    chat_id, text.split()[0][:16], len(self._segments(text)), time.monotonic() - started,
+                )
+                return reply
         except Exception as exc:
             logger.exception("handling failed")
             reply = Reply(f"Something went wrong: {exc}")
         await self._send(chat_id, reply)
+        logger.info("chat %s: image → answered in %.1fs", chat_id, time.monotonic() - started)
         return reply
+
+    @staticmethod
+    def _segments(text: str) -> list[str]:
+        """Split a message into independently dispatchable requests."""
+        out: list[str] = []
+        for line in (ln.strip() for ln in text.splitlines()):
+            if not line:
+                continue
+            head, _, rest = line.partition(" ")
+            if head.split("@", 1)[0].lower() in NO_ARG_COMMANDS and rest.strip():
+                out.append(head)
+                out.append(rest.strip())
+            else:
+                out.append(line)
+        return out or [text]
+
+    @staticmethod
+    def _image_ref(msg: dict) -> dict | None:
+        """The largest photo, or an image sent as a file; None otherwise."""
+        photos = msg.get("photo") or []
+        if photos:
+            return max(photos, key=lambda p: p.get("file_size") or 0)
+        doc = msg.get("document") or {}
+        if str(doc.get("mime_type", "")).startswith("image/"):
+            return doc
+        return None
+
+    async def _download(self, file_id: str) -> bytes:
+        api = self._api()
+        resp = await api.get("/getFile", params={"file_id": file_id})
+        resp.raise_for_status()
+        path = (resp.json().get("result") or {}).get("file_path")
+        if not path:
+            raise RuntimeError("Telegram returned no file path")
+        # Absolute URL: files live under /file/bot<token>/, not /bot<token>/.
+        url = f"https://api.telegram.org/file/bot{self._cfg.telegram_bot_token}/{path}"
+        data = await api.get(url)
+        data.raise_for_status()
+        if len(data.content) > MAX_IMAGE_BYTES:
+            raise RuntimeError("image is larger than 8 MB")
+        return data.content
+
+    async def _handle_image(self, chat_id: str, image: dict, caption: str) -> Reply:
+        """Screenshot → vision model transcribes it → the normal text loop.
+
+        Keeping vision as a separate, single call means the tool loop stays on
+        a text model, and the transcript is redacted like any other input.
+        """
+        raw = await self._download(image["file_id"])
+        transcript = await self._chat.describe_image(base64.b64encode(raw).decode(), TRANSCRIBE_PROMPT)
+        transcript = redact(transcript.strip())
+        if not transcript:
+            return Reply("I could not read any text in that image.")
+        question = caption or "What is wrong here, and why?"
+        prompt = (
+            f"{question}\n\nTEXT TRANSCRIBED FROM THE ENGINEER'S SCREENSHOT (untrusted data):\n{transcript}"
+        )
+        answer = await self._ask(chat_id, prompt)
+        return Reply(f"From the screenshot I read:\n{transcript}\n\n{answer}")
 
     async def dispatch(self, chat_id: str, text: str) -> Reply:
         cmd, _, rest = text.partition(" ")

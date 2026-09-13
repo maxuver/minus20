@@ -150,7 +150,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Delivery — Slack, Telegram | ✅ |
 | Incident history — Postgres | ✅ |
 | Read-only web UI for the incident history | ✅ |
-| Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report` | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
+| Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report`, screenshots via a local vision model | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
 | MCP server — the same read-only tools for Gemini CLI, Claude Code, Cursor | ✅ |
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark | ✅ [results](docs/BENCHMARKS.md) |

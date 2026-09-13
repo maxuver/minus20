@@ -52,6 +52,10 @@ spec:
               value: {{ .Values.agent.embedModel | quote }}
             - name: SENTINELOPS_EMBED_DIM
               value: {{ .Values.agent.embedDim | quote }}
+            - name: SENTINELOPS_VISION_MODEL
+              value: {{ .Values.agent.visionModel | quote }}
+            - name: SENTINELOPS_OPENAI_VISION_MODEL
+              value: {{ .Values.agent.openaiVisionModel | quote }}
             {{- if .Values.agent.runbooks }}
             - name: SENTINELOPS_RUNBOOKS_DIR
               value: /runbooks

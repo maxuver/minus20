@@ -15,6 +15,7 @@ the cluster, because the registry (tools.py) contains none.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
@@ -46,6 +47,39 @@ class ChatBackend(Protocol):
     name: str
 
     async def chat(self, messages: list[dict], tools: list[dict] | None) -> ChatTurn: ...
+
+    async def describe_image(self, image_b64: str, prompt: str) -> str: ...
+
+
+_JSON_OBJECT = re.compile(r"\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}", re.DOTALL)
+
+
+def salvage_tool_calls(content: str, known: set[str]) -> list[ToolCall]:
+    """Recover tool calls a small model *narrated* instead of *made*.
+
+    Seen live on qwen2.5:7b: with tools offered, it answered in prose and put
+    ```json {"name": "k8s_events", "arguments": {...}} ``` blocks in the text,
+    with an empty tool_calls list. The engineer got a plan instead of an
+    investigation. Any JSON object in the content with a known tool name and
+    an object of arguments is treated as the call it was meant to be; anything
+    else is left alone.
+    """
+    calls: list[ToolCall] = []
+    for match in _JSON_OBJECT.finditer(content or ""):
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        name = data.get("name") or (data.get("function") or {}).get("name")
+        args = data.get("arguments")
+        if args is None and isinstance(data.get("function"), dict):
+            args = data["function"].get("arguments")
+        args = _parse_arguments(args)
+        if isinstance(name, str) and name in known:
+            calls.append(ToolCall(name=name, arguments=args))
+    return calls
 
 
 def assistant_message(turn: ChatTurn) -> dict:
@@ -155,6 +189,29 @@ class OllamaChat:
             cost_usd=0.0,
         )
 
+    async def describe_image(self, image_b64: str, prompt: str) -> str:
+        """One call to a local vision model (qwen2.5vl, gemma3, llava, ...)."""
+        import httpx
+
+        client = self._client or httpx.AsyncClient(
+            base_url=self._cfg.ollama_url, timeout=self._cfg.agent_timeout_seconds
+        )
+        payload = {
+            "model": self._cfg.vision_model,
+            "stream": False,
+            "options": {"temperature": 0},
+            "messages": [{"role": "user", "content": prompt, "images": [image_b64]}],
+        }
+        try:
+            resp = await client.post("/api/chat", json=payload)
+            resp.raise_for_status()
+            return (resp.json().get("message") or {}).get("content") or ""
+        except Exception as exc:
+            raise BackendError(f"ollama vision call failed: {exc}") from exc
+        finally:
+            if self._client is None:
+                await client.aclose()
+
 
 class OpenAIChat:
     """Tool-calling chat against any OpenAI-compatible /chat/completions."""
@@ -219,6 +276,44 @@ class OpenAIChat:
                 6,
             ),
         )
+
+    async def describe_image(self, image_b64: str, prompt: str) -> str:
+        """Vision through the OpenAI dialect (Gemini, GPT-class; DeepSeek-chat has none)."""
+        import httpx
+
+        headers = {}
+        if self._cfg.openai_api_key:
+            headers["Authorization"] = f"Bearer {self._cfg.openai_api_key}"
+        client = self._client or httpx.AsyncClient(
+            base_url=self._cfg.openai_base_url,
+            timeout=self._cfg.agent_timeout_seconds,
+            headers=headers,
+        )
+        payload = {
+            "model": self._cfg.openai_vision_model or self._cfg.openai_model,
+            "temperature": 0,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
+                    ],
+                }
+            ],
+        }
+        try:
+            resp = await client.post("/chat/completions", json=payload)
+            resp.raise_for_status()
+            choices = resp.json().get("choices") or []
+        except Exception as exc:
+            raise BackendError(f"openai-compatible vision call failed: {exc}") from exc
+        finally:
+            if self._client is None:
+                await client.aclose()
+        if not choices:
+            raise BackendError("openai-compatible vision call returned no choices")
+        return (choices[0].get("message") or {}).get("content") or ""
 
 
 def get_chat_backend(cfg: Settings = settings) -> ChatBackend:

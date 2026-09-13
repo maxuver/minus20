@@ -22,4 +22,5 @@ Agent enabled: talk to the bot in the allow-listed Telegram chat.
   /help     what it can do      /report 7   weekly incident review
   /status   what it can reach   /wrong <id> <cause>   teach it the real cause
 Memory needs the embedding model in Ollama:  ollama pull {{ .Values.agent.embedModel }}
+Screenshots need a vision model:              ollama pull {{ .Values.agent.visionModel }}
 {{- end }}

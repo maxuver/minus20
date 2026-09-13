@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     embed_dim: int = 768
     # Directory of .md/.txt runbooks to index into memory (mounted ConfigMap).
     runbooks_dir: str = ""
+    # Screenshots sent to the agent are transcribed by a vision model first,
+    # then handled as text. Ollama: qwen2.5vl, gemma3, llava. For the openai
+    # provider the chat model is used unless a vision one is named.
+    vision_model: str = "qwen2.5vl:7b"
+    openai_vision_model: str = ""
 
     # --- MCP server (the same read-only tools, for any agent CLI) ---
     mcp_transport: str = "stdio"  # "stdio" (local CLI) | "http" (in-cluster Service)

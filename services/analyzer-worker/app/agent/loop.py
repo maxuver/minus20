@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from ..config import Settings, settings
 from ..ports import BackendError, Budget
 from . import tools
-from .chat import ChatBackend, assistant_message, tool_message
+from .chat import ChatBackend, assistant_message, salvage_tool_calls, tool_message
 
 logger = logging.getLogger("sentinelops.agent.loop")
 
@@ -141,6 +141,11 @@ class Agent:
             answer.input_tokens += turn.input_tokens
             answer.output_tokens += turn.output_tokens
             answer.cost_usd = round(answer.cost_usd + turn.cost_usd, 6)
+            if not turn.tool_calls:
+                salvaged = salvage_tool_calls(turn.content, set(tools.TOOLS))
+                if salvaged:
+                    logger.info("salvaged %d narrated tool call(s)", len(salvaged))
+                    turn.tool_calls = salvaged
             messages.append(assistant_message(turn))
 
             if not turn.tool_calls:

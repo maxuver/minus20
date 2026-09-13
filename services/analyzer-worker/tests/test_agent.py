@@ -19,6 +19,7 @@ CC-39  Ollama message translation carries tool results in Ollama's shape.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -51,6 +52,11 @@ class FakeChat:
         if not self._turns:
             return ChatTurn(content="(no more scripted turns)")
         return self._turns.pop(0)
+
+    async def describe_image(self, image_b64, prompt):
+        self.images = getattr(self, "images", [])
+        self.images.append((image_b64, prompt))
+        return "billing-api-7f9c   0/1   CrashLoopBackOff\nERROR could not connect to postgres:5432 from admin@corp.example"
 
 
 class FakeConn:
@@ -442,6 +448,10 @@ def _bot(pool=None, memory=None, chat=None, agent=None):
             import json
 
             sent.append(json.loads(request.read()))
+        if request.url.path.endswith("/getFile"):
+            return httpx.Response(200, json={"ok": True, "result": {"file_path": "photos/1.jpg"}})
+        if "/file/bot" in str(request.url):
+            return httpx.Response(200, content=b"\xff\xd8fakejpeg")
         return httpx.Response(200, json={"ok": True, "result": {}})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://tg/botTOKEN")
@@ -511,6 +521,86 @@ async def test_bot_group_command_suffix_is_stripped():
     assert (await bot.dispatch("42", "/help@SentinelBot")).text == HELP
 
 
+async def test_bot_answers_every_request_in_one_message():
+    """'/status' followed by a question used to answer only the status."""
+    chat = FakeChat([ChatTurn(content="Likely cause: OOM.")])
+    bot, sent = _bot(chat=chat)
+    await bot.handle(_update(42, "/status why did billing-api crash?"))
+    texts = [m["text"] for m in sent]
+    assert any("read-only" in t for t in texts)  # the status
+    assert any(t.startswith("Likely cause") for t in texts)  # and the question
+    sent.clear()
+    await bot.handle(_update(42, "/help\n/status"))
+    assert len(sent) == 2
+
+
+def test_segments_split_lines_and_bare_commands():
+    seg = TelegramBot._segments
+    assert seg("/status") == ["/status"]
+    assert seg("/status почему падает billing-api?") == ["/status", "почему падает billing-api?"]
+    assert seg("/report 30") == ["/report 30"]  # a command that takes arguments stays whole
+    assert seg("/wrong abc it was X") == ["/wrong abc it was X"]
+    assert seg("line one\n\n/report 7") == ["line one", "/report 7"]
+
+
+async def test_bot_transcribes_a_screenshot_then_asks_the_agent():
+    chat = FakeChat([ChatTurn(content="Cause: the database is unreachable.")])
+    bot, sent = _bot(chat=chat)
+    update = {
+        "update_id": 7,
+        "message": {
+            "chat": {"id": 42},
+            "caption": "what is this?",
+            "photo": [{"file_id": "small", "file_size": 10}, {"file_id": "big", "file_size": 999}],
+        },
+    }
+    reply = await bot.handle(update)
+
+    assert chat.images and chat.images[0][0]  # the image reached the vision model, base64
+    question = chat.requests[-1][0][-1]["content"]  # what the tool loop was asked
+    assert question.startswith("what is this?")
+    assert "postgres:5432" in question
+    assert "admin@corp.example" not in question  # transcript is redacted before the loop
+    assert reply.text.startswith("From the screenshot I read:")
+    assert "Cause: the database is unreachable." in reply.text
+    assert sent[-1]["text"].startswith("From the screenshot")
+
+
+async def test_bot_handles_an_image_sent_as_a_file_and_ignores_other_files():
+    chat = FakeChat([ChatTurn(content="ok")])
+    bot, _sent = _bot(chat=chat)
+    as_file = {"update_id": 8, "message": {"chat": {"id": 42}, "document": {"file_id": "d", "mime_type": "image/png"}}}
+    assert (await bot.handle(as_file)) is not None
+    pdf = {"update_id": 9, "message": {"chat": {"id": 42}, "document": {"file_id": "p", "mime_type": "application/pdf"}}}
+    assert (await bot.handle(pdf)) is None
+
+
+async def test_loop_salvages_narrated_tool_calls():
+    """A 7B model wrote its tool calls as JSON in prose; the loop still runs them."""
+    narrated = ChatTurn(
+        content='Let me check:\n```json\n{"name": "recent_incidents", "arguments": {"hours": 2}}\n```'
+    )
+    chat = FakeChat([narrated, ChatTurn(content="Found it.")])
+    ctx = tools.ToolContext(cfg=_cfg(), pool=FakePool(incidents=[_incident()]))
+    agent = Agent(chat, ctx, InMemoryBudget(1.0), _cfg())
+
+    answer = await agent.ask("what happened?")
+
+    assert answer.tool_calls == ["recent_incidents"]
+    assert answer.text == "Found it."
+    tool_msgs = [m for m in chat.requests[-1][0] if m["role"] == "tool"]
+    assert tool_msgs and "#abcdef12" in tool_msgs[0]["content"]
+
+
+def test_salvage_ignores_unknown_tools_and_non_calls():
+    from app.agent.chat import salvage_tool_calls
+
+    text = '{"name": "rm_rf", "arguments": {}} {"foo": 1} {"name": "k8s_events", "arguments": "{\\"namespace\\": \\"a\\"}"}'
+    calls = salvage_tool_calls(text, {"k8s_events"})
+    assert [(c.name, c.arguments) for c in calls] == [("k8s_events", {"namespace": "a"})]
+    assert salvage_tool_calls("no json here", {"k8s_events"}) == []
+
+
 # ---- chat adapters (CC-39) ----------------------------------------------
 
 
@@ -577,4 +667,38 @@ async def test_openai_chat_parses_string_arguments_and_prices():
     assert turn.tool_calls[0].id == "call_1"
     assert turn.tool_calls[0].arguments == {"query": "dns"}
     assert turn.cost_usd == pytest.approx(0.001)
+    await client.aclose()
+
+
+
+async def test_ollama_describe_image_sends_images_field():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.read())
+        return httpx.Response(200, json={"message": {"content": "ERROR could not connect"}})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://ollama")
+    out = await OllamaChat(_cfg(vision_model="qwen2.5vl:7b"), client=client).describe_image("QUJD", "transcribe")
+    assert out == "ERROR could not connect"
+    assert seen["body"]["model"] == "qwen2.5vl:7b"
+    assert seen["body"]["messages"][0]["images"] == ["QUJD"]
+    assert "tools" not in seen["body"]
+    await client.aclose()
+
+
+async def test_openai_describe_image_uses_data_url_and_vision_model():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.read())
+        return httpx.Response(200, json={"choices": [{"message": {"content": "CrashLoopBackOff"}}]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://p/v1")
+    cfg = _cfg(openai_model="deepseek-chat", openai_vision_model="gemini-2.5-flash")
+    out = await OpenAIChat(cfg, client=client).describe_image("QUJD", "transcribe")
+    assert out == "CrashLoopBackOff"
+    assert seen["body"]["model"] == "gemini-2.5-flash"
+    parts = seen["body"]["messages"][0]["content"]
+    assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,QUJD")
     await client.aclose()

@@ -199,6 +199,13 @@ what changed in payments in the last 6 hours?
 /ok 3f9a1c2e
 ```
 
+**Screenshots work too.** Send a photo of the error (a terminal, a Grafana
+panel, a log viewer) with a question as its caption. A local vision model
+(`agent.visionModel`, default `qwen2.5vl:7b`, `ollama pull` it first)
+transcribes the text, the transcript is redacted like any other input, and
+the same tool loop answers. Measured on CPU: about a minute for transcription
+plus the answer.
+
 `/wrong` and `/ok` quote the `#id` from an alert message. The verdict is stored
 on the incident and indexed, so the next similar incident is answered with
 "the last time this happened the real cause was...". That is the part that
