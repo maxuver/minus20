@@ -29,11 +29,13 @@ terraform validate
 ## Provision, demo, destroy (needs AWS credentials)
 
 ```bash
-export AWS_PROFILE=sentinelops     # a named profile; see "Credentials and IAM" below
+# once per account: the S3 bucket that holds the state (versioned, encrypted, private)
+terraform -chdir=bootstrap init && terraform -chdir=bootstrap apply -var aws_profile=sentinelops
+terraform -chdir=bootstrap output -raw backend_hcl > backend.hcl   # gitignored
 
-terraform init
-terraform plan -var budget_alert_email=you@example.com
-terraform apply -var budget_alert_email=you@example.com
+terraform init -backend-config=backend.hcl
+terraform plan  -var aws_profile=sentinelops -var budget_alert_email=you@example.com
+terraform apply -var aws_profile=sentinelops -var budget_alert_email=you@example.com
 
 aws eks update-kubeconfig --region eu-central-1 --name sentinelops
 helm upgrade --install so ../../deploy/sentinelops -n sentinelops --create-namespace
@@ -81,12 +83,22 @@ Leave it empty and no budget is created, for teams that manage budgets centrally
 
 Destroy the cluster when the demo is over. This is not meant to run 24/7.
 
+## State
+
+State is remote: an S3 bucket created by `bootstrap/` (versioned, AES-256,
+public access blocked), locked natively by Terraform >= 1.10 (`use_lockfile =
+true`), so there is no DynamoDB table to run. The bucket name is
+account-specific and lives in `backend.hcl`, which is gitignored;
+`backend.hcl.example` shows the shape. State contains every resource
+attribute in clear text, which is why it is never local and never committed.
+
 ## Credentials and IAM (what this run used, and what it should use)
 
 The first real run used an IAM user (`sentinelops-terraform`) with
 `AdministratorAccess` and a long-lived access key, configured as a named
-profile (`aws configure --profile sentinelops`, `AWS_PROFILE=sentinelops
-terraform apply`). Stated plainly because it is the wrong long-term shape:
+profile (`aws configure --profile sentinelops`, passed as `-var
+aws_profile=sentinelops`; the provider never sees a key). Stated plainly
+because it is the wrong long-term shape:
 
 - **Prefer short-lived credentials.** AWS CLI v2's `aws login` (browser sign-in
   with console credentials) or IAM Identity Center issue temporary keys; a CSV

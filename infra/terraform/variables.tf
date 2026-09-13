@@ -4,6 +4,12 @@ variable "region" {
   default     = "eu-central-1"
 }
 
+variable "aws_profile" {
+  description = "Named AWS CLI profile (aws configure --profile ...). Null uses the default credential chain, which is what CI and SSO want."
+  type        = string
+  default     = null
+}
+
 variable "cluster_name" {
   description = "EKS cluster name."
   type        = string

@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and fill in the bucket from bootstrap/:
+#   terraform -chdir=bootstrap output -raw backend_hcl > backend.hcl
+bucket       = "sentinelops-tfstate-xxxxxx"
+key          = "eks/terraform.tfstate"
+region       = "eu-central-1"
+use_lockfile = true
+profile      = "sentinelops"

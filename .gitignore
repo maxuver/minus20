@@ -18,6 +18,11 @@ venv/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+# Backend config names an account-specific bucket; the example is committed.
+backend.hcl
+# IAM access-key exports (should never be near a repo, belt and braces)
+*accessKeys*.csv
+*_credentials.csv
 # .terraform.lock.hcl is committed on purpose (pins provider versions).
 
 # IDE / OS
