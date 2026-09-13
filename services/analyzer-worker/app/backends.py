@@ -226,7 +226,7 @@ class OpenAICompatibleBackend:
         payload = {
             "model": self._cfg.openai_model,
             "temperature": 0,
-            "max_tokens": self._cfg.anthropic_max_tokens,
+            "max_tokens": self._cfg.openai_max_tokens,
             "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},

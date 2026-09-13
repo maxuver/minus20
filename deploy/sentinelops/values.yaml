@@ -47,6 +47,11 @@ config:
   # work by changing the URL. Key: so-llm Secret, key openai-api-key.
   openaiBaseUrl: https://api.deepseek.com/v1
   openaiModel: deepseek-chat
+  # USD per million tokens, only used to record cost per incident. Defaults are
+  # DeepSeek list prices; set to the provider's (Gemini 2.5 Flash: 0.30 / 2.50;
+  # a free tier is 0 / 0).
+  openaiPriceInPerMtok: 0.28
+  openaiPriceOutPerMtok: 0.42
   collectors: k8s-events
   notifier: stub
   # memory | postgres. postgres stores the incident history (redacted only).

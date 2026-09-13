@@ -159,6 +159,20 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
   --set config.collectors=k8s-events\,prometheus\,loki
 ```
 
+**Gemini** is the same adapter with Google's OpenAI-compatible endpoint. Create
+a key at aistudio.google.com/apikey (keys created in 2026 do not necessarily
+start with `AIza`), store it under the same `openai-api-key` name (the name
+means "the OpenAI *dialect*", not the company), and name a current model:
+
+```bash
+kubectl -n sentinelops create secret generic so-llm --from-literal=openai-api-key='...'
+helm upgrade --install so deploy/sentinelops -n sentinelops   --set config.llmProvider=openai   --set config.openaiBaseUrl=https://generativelanguage.googleapis.com/v1beta/openai/   --set config.openaiModel=gemini-3.6-flash   --set config.openaiPriceInPerMtok=0 --set config.openaiPriceOutPerMtok=0
+```
+
+Measured 2026-09-13: hard benchmark 5/5 in 7.6 s average (`docs/BENCHMARKS.md`).
+Google's free tier may use your data to improve its products; use a paid key
+or a local model for real logs.
+
 **Anthropic:**
 
 ```bash

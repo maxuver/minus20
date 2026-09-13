@@ -164,11 +164,11 @@ Stated plainly, because you will find them anyway:
 - **The web UI has no authentication.** It is read-only and its Service is
   ClusterIP on purpose; reach it with `kubectl port-forward`, do not expose it.
 - **No multi-tenancy.** Single team, single cluster.
-- **Accuracy is measured, and it is mixed.** On scenarios whose signal is stated
-  plainly it gets 6/6; on scenarios built to mislead it gets 2/5, because it
-  struggles to reason by elimination. Method and case-by-case results:
-  [docs/BENCHMARKS.md](docs/BENCHMARKS.md). Nothing has been measured against
-  real production incidents yet.
+- **Accuracy depends on the model, and it is measured.** With the local 7B
+  model: 6/6 on plainly-stated scenarios, 2/5 on scenarios built to mislead.
+  With a current cloud model through the same pipeline: 6/6 and 5/5, in 7 s.
+  Method and case-by-case results: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+  Nothing has been measured against real production incidents yet.
 - **Kubernetes only.** No other alert sources yet.
 - **The agent is slow on CPU.** With a local 7B model a multi-step question
   takes minutes (measured: 8 min for four tool calls); a cloud model takes

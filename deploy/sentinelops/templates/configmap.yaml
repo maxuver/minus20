@@ -13,6 +13,8 @@ data:
   SENTINELOPS_LLM_TIMEOUT_SECONDS: {{ .Values.config.llmTimeoutSeconds | quote }}
   SENTINELOPS_OPENAI_BASE_URL: {{ .Values.config.openaiBaseUrl | quote }}
   SENTINELOPS_OPENAI_MODEL: {{ .Values.config.openaiModel | quote }}
+  SENTINELOPS_OPENAI_PRICE_IN_PER_MTOK: {{ .Values.config.openaiPriceInPerMtok | quote }}
+  SENTINELOPS_OPENAI_PRICE_OUT_PER_MTOK: {{ .Values.config.openaiPriceOutPerMtok | quote }}
   SENTINELOPS_COLLECTORS: {{ .Values.config.collectors | quote }}
   SENTINELOPS_NOTIFIER: {{ .Values.config.notifier | quote }}
   SENTINELOPS_PROMETHEUS_URL: {{ .Values.config.prometheusUrl | quote }}

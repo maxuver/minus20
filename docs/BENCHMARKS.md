@@ -4,8 +4,9 @@ Measured, reproducible, and reported whether or not the number flatters the
 project. A tool that tells you what broke at 3 AM has to be honest about how
 often it is wrong.
 
-Last run: 2026-09-09 · model `qwen2.5:7b` via Ollama, CPU only (no GPU) ·
-cost $0.00 per alert.
+Last runs: 2026-09-09 with `qwen2.5:7b` via Ollama, CPU only (no GPU);
+2026-09-13 with `gemini-3.6-flash` through the OpenAI-compatible adapter
+(free tier). Cost $0.00 per alert in both.
 
 ## Method
 
@@ -25,20 +26,22 @@ they go the wrong way regardless of what the evidence contains.
 
 ## Results
 
-| Set | Scenarios | Correct | Avg time to hypothesis | Cost |
-|---|---|---|---|---|
-| Easy — signal stated plainly in the context | 6 | **6/6** | 31.5 s | $0.00 |
-| Hard — the obvious signal points the wrong way | 5 | **2/5** | 30.3 s | $0.00 |
+| Set | Scenarios | qwen2.5:7b, CPU | gemini-3.6-flash, API |
+|---|---|---|---|
+| Easy — signal stated plainly in the context | 6 | **6/6**, 31.5 s avg | **6/6**, 7.2 s avg |
+| Hard — the obvious signal points the wrong way | 5 | **2/5**, 30.3 s avg | **5/5**, 7.6 s avg |
+
+Same pipeline, same prompt, same scenarios, one environment variable changed.
 
 ### Hard set, case by case
 
-| Scenario | The model said | Verdict |
-|---|---|---|
-| OOM caused by a sidecar | "Memory pressure due to log-shipper container consuming excessive memory" | ✅ found the real culprit |
-| Volume full from an unrotated log | "Log files are filling up the PersistentVolume" | ✅ not fooled by "data grew" |
-| CrashLoop from a missing Secret | "failed database connection attempts" | ❌ took the bait |
-| DNS failing because of a NetworkPolicy | "DNS resolution failure" | ❌ blamed DNS, missed the policy |
-| 5xx caused by a rollout | "Database timeout causing high 5xx error rate" | ❌ blamed the database, missed the deploy |
+| Scenario | qwen2.5:7b said | Verdict | gemini-3.6-flash said | Verdict |
+|---|---|---|---|---|
+| OOM caused by a sidecar | "Memory pressure due to log-shipper container consuming excessive memory" | ✅ | "The log-shipper sidecar container in pod checkout-api…" | ✅ |
+| Volume full from an unrotated log | "Log files are filling up the PersistentVolume" | ✅ | "An unrotated application log file (/var/lib/postgresql/data/…)" | ✅ |
+| CrashLoop from a missing Secret | "failed database connection attempts" | ❌ took the bait | "The pod 'orders-api-…' is failing to start because [the Secret]…" | ✅ |
+| DNS failing because of a NetworkPolicy | "DNS resolution failure" | ❌ blamed DNS | "The newly applied NetworkPolicy 'demo-default-deny'…" | ✅ |
+| 5xx caused by a rollout | "Database timeout causing high 5xx error rate" | ❌ blamed the database | "The deployment of payments-api version v2.4.0 (replicaset …)" | ✅ |
 
 ## What the pattern says
 
@@ -52,9 +55,18 @@ The two passes and the three failures split cleanly:
   healthy, *therefore* something else is blocking resolution." In all three
   failures the disproving evidence was in the context and was not used.
 
-This is a limit of a 7B model on CPU, not of the pipeline. It also says where
-the effort belongs next: prompt and context design — asking the model to rule out
-the obvious explanation first — rather than more plumbing.
+This was a limit of a 7B model, not of the pipeline, and the second run
+proves it: with nothing changed but `SENTINELOPS_LLM_PROVIDER`, a current
+cloud model gets all five, in a quarter of the time. The three cases the 7B
+model failed were exactly the ones needing elimination ("the database answers
+normally, so it is not the database"), and the larger model does that
+reasoning unprompted.
+
+What that means in practice: the local, zero-egress backend is the right
+default for privacy and cost, and it handles the plainly-stated majority; for
+misleading incidents a cloud model is measurably better, and switching is one
+value. Prompt work for the small model ("rule out the obvious first") is still
+worth doing, and is the next item.
 
 ## How to read these numbers
 
@@ -79,5 +91,18 @@ SENTINELOPS_LLM_TIMEOUT_SECONDS=300 \
 python -m app.replay scenarios/hard
 ```
 
-Swap `scenarios/hard` for the default directory to run the easy set. Point
-`SENTINELOPS_LLM_PROVIDER` at `anthropic` to compare a cloud model.
+Swap `scenarios/hard` for the default directory to run the easy set. For the
+cloud run:
+
+```bash
+SENTINELOPS_LLM_PROVIDER=openai \
+SENTINELOPS_OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
+SENTINELOPS_OPENAI_MODEL=gemini-3.6-flash \
+SENTINELOPS_OPENAI_API_KEY=... \
+python -m app.replay scenarios/hard
+```
+
+Note on the free tier: Google states that free-tier data may be used to improve
+its products. Fine for a benchmark on synthetic scenarios; not a production
+setting for real logs. The 2026-09-13 run was executed inside the cluster so
+the key never left it.

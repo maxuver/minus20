@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.deepseek.com/v1"
     openai_model: str = "deepseek-chat"
     openai_api_key: str = ""
+    # Output budget for the one structured call. Reasoning models (Gemini 3.x,
+    # DeepSeek reasoner) spend part of it on thinking; 512 truncated Gemini's
+    # JSON mid-object in the first live run.
+    openai_max_tokens: int = 4096
     # USD per 1M tokens, used only to record cost per incident (DeepSeek list price).
     openai_price_in_per_mtok: float = 0.28
     openai_price_out_per_mtok: float = 0.42
