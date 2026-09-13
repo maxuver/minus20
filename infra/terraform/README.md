@@ -7,9 +7,13 @@ behind EKS blueprints).
 
 ## Status (honest)
 
-`terraform init` and `terraform validate` pass. **Applying requires AWS
-credentials** and is intentionally ephemeral: apply, deploy the Helm chart, demo,
-then `destroy`, to keep the bill to a few dollars. The same
+Applied to a real AWS account once, on 2026-09-13: 62 resources in 13 minutes,
+the published chart installed from GHCR, a real incident analysed on the
+cluster, everything destroyed 18 minutes later, about ten cents. The full
+record, including what went wrong, is in [`docs/EKS-RUN.md`](../../docs/EKS-RUN.md).
+The EBS CSI add-on was added afterwards (`addons.tf`) and has been validated
+but not yet applied. Applying is intentionally ephemeral: apply, deploy the
+Helm chart, demo, then `destroy`, to keep the bill to cents. The same
 [`deploy/sentinelops`](../../deploy/sentinelops) Helm chart runs unchanged on
 this cluster and on local kind, so nothing about the application layer is
 AWS-specific.
@@ -25,12 +29,11 @@ terraform validate
 ## Provision, demo, destroy (needs AWS credentials)
 
 ```bash
-export AWS_ACCESS_KEY_ID=...        # or an SSO / profile
-export AWS_SECRET_ACCESS_KEY=...
+export AWS_PROFILE=sentinelops     # a named profile; see "Credentials and IAM" below
 
 terraform init
-terraform plan
-terraform apply
+terraform plan -var budget_alert_email=you@example.com
+terraform apply -var budget_alert_email=you@example.com
 
 aws eks update-kubeconfig --region eu-central-1 --name sentinelops
 helm upgrade --install so ../../deploy/sentinelops -n sentinelops --create-namespace
@@ -77,3 +80,33 @@ Leave it empty and no budget is created, for teams that manage budgets centrally
 - Everything tagged `Lifecycle = ephemeral`
 
 Destroy the cluster when the demo is over. This is not meant to run 24/7.
+
+## Credentials and IAM (what this run used, and what it should use)
+
+The first real run used an IAM user (`sentinelops-terraform`) with
+`AdministratorAccess` and a long-lived access key, configured as a named
+profile (`aws configure --profile sentinelops`, `AWS_PROFILE=sentinelops
+terraform apply`). Stated plainly because it is the wrong long-term shape:
+
+- **Prefer short-lived credentials.** AWS CLI v2's `aws login` (browser sign-in
+  with console credentials) or IAM Identity Center issue temporary keys; a CSV
+  access key on a laptop is a standing liability. Delete or rotate the key
+  after each demo.
+- **Least privilege is a backlog item, not optional.** What this configuration
+  actually needs, to scope a policy to: `eks:*` on the cluster and node group;
+  `ec2:*` for VPC, subnets, route tables, NAT and security groups; `iam:` for
+  the cluster and node roles, instance profile and OIDC provider (`CreateRole`,
+  `AttachRolePolicy`, `PassRole`, `CreateOpenIDConnectProvider`, plus the
+  read/delete counterparts); `kms:*` on the cluster secrets key the module
+  creates; `logs:` for the control-plane log group; `budgets:` for the spend
+  alarm; `sts:GetCallerIdentity`; `ssm:GetParameter` for the AMI lookup. S3 and
+  DynamoDB only if state moves to a remote backend (it is local here). Nothing
+  else. Building that policy from CloudTrail after one run is the honest way
+  to derive it.
+- **MFA on the root user** and never using root keys for Terraform.
+
+Kubernetes version note: this configuration pins a version in **standard**
+support (`cluster_version`, checked with `aws eks describe-cluster-versions`).
+Versions in extended support cost six times more per hour ($0.60 vs $0.10) and
+versions past extended support cannot be created at all, which is how a
+year-old pin of 1.30 would have failed on first apply.

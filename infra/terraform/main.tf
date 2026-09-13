@@ -44,13 +44,29 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
+  # See addons.tf for why the EBS CSI driver is here.
+  cluster_addons = {
+    coredns                = {}
+    kube-proxy             = {}
+    vpc-cni                = {}
+    eks-pod-identity-agent = {}
+    aws-ebs-csi-driver = {
+      pod_identity_association = [{
+        role_arn        = aws_iam_role.ebs_csi.arn
+        service_account = "ebs-csi-controller-sa"
+      }]
+    }
+  }
+
   eks_managed_node_groups = {
     default = {
       instance_types = var.node_instance_types
       capacity_type  = "SPOT"
-      min_size       = 1
-      max_size       = 3
-      desired_size   = var.node_desired_size
+      # AL2 AMIs ended with Kubernetes 1.32; be explicit rather than trust the API default.
+      ami_type     = "AL2023_x86_64_STANDARD"
+      min_size     = 1
+      max_size     = 3
+      desired_size = var.node_desired_size
     }
   }
 

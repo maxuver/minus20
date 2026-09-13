@@ -34,3 +34,6 @@ skills-lock.json
 
 # Private planning docs — never publish commercial/pricing strategy
 docs/_private/
+
+# Terraform saved plans can embed variable values
+*.tfplan

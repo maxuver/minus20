@@ -155,7 +155,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark | ✅ [results](docs/BENCHMARKS.md) |
 | CI — lint, tests, container build, helm lint, SAST, dependency scan, secret scan of full history | ✅ |
-| Terraform for AWS EKS | ⚠️ `init` and `validate` pass; never applied to real AWS |
+| Terraform for AWS EKS | ✅ applied to real AWS on 2026-09-13, chart installed from GHCR, real incident analysed, destroyed 18 min later — [proof](docs/EKS-RUN.md) |
 
 ### Known limitations
 
@@ -187,7 +187,7 @@ services/
   web-ui/            read-only incident history (FastAPI + Jinja2)
 deploy/
   sentinelops/       Helm chart (services, RBAC, Postgres)
-infra/terraform/     AWS VPC + EKS (validated, not applied)
+infra/terraform/     AWS VPC + EKS (applied once for real, see docs/EKS-RUN.md)
 kind/                local cluster and monitoring stack config
 docs/
   ARCHITECTURE.md    the map: two processes, ports and adapters, what never leaves
