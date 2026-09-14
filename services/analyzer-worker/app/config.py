@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     # analysis, so a slow-but-alive consumer is never robbed of its message.
     reclaim_idle_ms: int = 120_000
 
-    # --- context collectors (comma-separated: stub, k8s-events, k8s-logs, prometheus, loki) ---
+    # --- context collectors (comma-separated: stub, k8s-events, k8s-logs, prometheus, loki,
+    #     cloudwatch-logs, cloudwatch-metrics) ---
     # Fixed in config, not chosen by the model at runtime (ADR-0001).
     collectors: str = "stub"
     k8s_max_events: int = 20
@@ -33,6 +34,12 @@ class Settings(BaseSettings):
     loki_url: str = "http://localhost:3100"
     loki_max_lines: int = 50
     loki_window_minutes: int = 15
+    # CloudWatch (EKS with Container Insights): pod logs through Logs Insights
+    # and pod metrics from the ContainerInsights namespace. Credentials come
+    # from the pod's identity (EKS Pod Identity / IRSA), never from config.
+    cloudwatch_log_group: str = ""  # e.g. /aws/containerinsights/<cluster>/application
+    cloudwatch_cluster_name: str = ""
+    aws_region: str = ""  # empty = the SDK's default resolution
 
     # --- LLM backend (ADR-0002: selecting a backend is configuration, not code) ---
     llm_provider: str = "stub"  # "anthropic" | "ollama" | "openai" | "stub"

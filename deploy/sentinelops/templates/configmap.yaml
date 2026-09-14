@@ -21,5 +21,8 @@ data:
   SENTINELOPS_NOTIFIER: {{ .Values.config.notifier | quote }}
   SENTINELOPS_PROMETHEUS_URL: {{ .Values.config.prometheusUrl | quote }}
   SENTINELOPS_LOKI_URL: {{ .Values.config.lokiUrl | quote }}
+  SENTINELOPS_CLOUDWATCH_LOG_GROUP: {{ .Values.config.cloudwatchLogGroup | quote }}
+  SENTINELOPS_CLOUDWATCH_CLUSTER_NAME: {{ .Values.config.cloudwatchClusterName | quote }}
+  SENTINELOPS_AWS_REGION: {{ .Values.config.awsRegion | quote }}
   SENTINELOPS_TELEGRAM_CHAT_ID: {{ include "sentinelops.chatId" .Values.config.telegramChatId | quote }}
   SENTINELOPS_STORE: {{ .Values.config.store | quote }}

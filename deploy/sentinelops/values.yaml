@@ -73,6 +73,13 @@ config:
   store: memory
   prometheusUrl: http://localhost:9090
   lokiUrl: http://localhost:3100
+  # EKS with Container Insights and no Loki/Prometheus: add cloudwatch-logs
+  # and cloudwatch-metrics to collectors and set these. Credentials come from
+  # EKS Pod Identity on the chart's ServiceAccount (infra/terraform/
+  # sentinelops-identity.tf), never from a Secret.
+  cloudwatchLogGroup: ""       # e.g. /aws/containerinsights/<cluster>/application
+  cloudwatchClusterName: ""
+  awsRegion: ""
   # Chat that receives incidents when notifier=telegram. The bot token is NOT
   # here: it lives in a Secret (see deploy/README.md), never in values.
   telegramChatId: ""

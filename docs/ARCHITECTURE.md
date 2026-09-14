@@ -47,7 +47,7 @@ vendor is never a code change (ADR-0002).
 
 | Port | Adapters | Selected by |
 |---|---|---|
-| `Collector` | `K8sEventsCollector`, `PrometheusCollector`, `LokiCollector`, `StubCollector`, fanned out by `AggregateCollector` | `SENTINELOPS_COLLECTORS` |
+| `Collector` | `K8sEventsCollector`, `K8sPodLogsCollector`, `PrometheusCollector`, `LokiCollector`, `CloudWatchLogsCollector`, `CloudWatchMetricsCollector`, `StubCollector`, fanned out by `AggregateCollector` | `SENTINELOPS_COLLECTORS` |
 | `LLMBackend` | `OllamaBackend` (local, $0), `OpenAICompatibleBackend` (DeepSeek, Groq, Gemini, vLLM…), `AnthropicBackend`, `StubBackend`; `FallbackBackend` tiers any two | `SENTINELOPS_LLM_PROVIDER`, `_LLM_FALLBACK_PROVIDER` |
 | `Notifier` | `SlackNotifier` (Incoming Webhook), `TelegramNotifier`, `StubNotifier` | `SENTINELOPS_NOTIFIER` |
 | `IncidentStore` | `PostgresStore`, `InMemoryStore` | `SENTINELOPS_STORE` |

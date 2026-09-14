@@ -148,6 +148,29 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 Neither credential ever goes into `values.yaml` or the ConfigMap. A Slack
 webhook URL *is* the credential — anyone holding it can post to the channel.
 
+## EKS with CloudWatch instead of Loki and Prometheus
+
+Container Insights ships pod logs to CloudWatch Logs and pod metrics to the
+`ContainerInsights` namespace. Two collectors read them, read-only, with the
+pod's own AWS identity (EKS Pod Identity on the chart's ServiceAccount;
+`infra/terraform/sentinelops-identity.tf` creates the role and the
+association, policy: `logs:StartQuery`, `logs:GetQueryResults`,
+`cloudwatch:GetMetricData`):
+
+```bash
+helm upgrade --install so oci://ghcr.io/maxuver/charts/sentinelops -n sentinelops \
+  --set config.collectors='k8s-events\,k8s-logs\,cloudwatch-logs\,cloudwatch-metrics' \
+  --set config.cloudwatchLogGroup=/aws/containerinsights/<cluster>/application \
+  --set config.cloudwatchClusterName=<cluster>
+```
+
+Logs Insights queries are asynchronous and metered; the collector caps each
+at 20 s and 50 lines. Written against the Container Insights field names
+(`kubernetes.namespace_name`, `kubernetes.pod_name`, `log`); a custom Fluent
+Bit layout needs the query adjusted in `app/cloudwatch.py`. Tested against
+a fake client in CI; a live run on EKS with Container Insights enabled is
+still to be done.
+
 ## Alert storms
 
 A node dies or a bad rollout lands and thirty pods fire the same alert. The

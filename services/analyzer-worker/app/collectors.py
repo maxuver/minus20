@@ -299,6 +299,27 @@ class AggregateCollector:
         return merged
 
 
+def _cloudwatch_logs(cfg):
+    from .cloudwatch import CloudWatchLogsCollector
+
+    if not cfg.cloudwatch_log_group:
+        raise ValueError("cloudwatch-logs needs SENTINELOPS_CLOUDWATCH_LOG_GROUP")
+    return CloudWatchLogsCollector(
+        cfg.cloudwatch_log_group, region=cfg.aws_region,
+        max_lines=cfg.loki_max_lines, window_minutes=cfg.loki_window_minutes,
+    )
+
+
+def _cloudwatch_metrics(cfg):
+    from .cloudwatch import CloudWatchMetricsCollector
+
+    if not cfg.cloudwatch_cluster_name:
+        raise ValueError("cloudwatch-metrics needs SENTINELOPS_CLOUDWATCH_CLUSTER_NAME")
+    return CloudWatchMetricsCollector(
+        cfg.cloudwatch_cluster_name, region=cfg.aws_region, window_minutes=cfg.loki_window_minutes
+    )
+
+
 _REGISTRY = {
     "stub": lambda cfg: StubCollector(),
     "k8s-events": lambda cfg: K8sEventsCollector(max_events=cfg.k8s_max_events),
@@ -307,6 +328,8 @@ _REGISTRY = {
     "loki": lambda cfg: LokiCollector(
         cfg.loki_url, max_lines=cfg.loki_max_lines, window_minutes=cfg.loki_window_minutes
     ),
+    "cloudwatch-logs": _cloudwatch_logs,
+    "cloudwatch-metrics": _cloudwatch_metrics,
 }
 
 

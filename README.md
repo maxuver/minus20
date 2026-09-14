@@ -96,6 +96,7 @@ python -m app.replay
 | Slack Incoming Webhook **or** Telegram bot token | delivery | yes |
 | Prometheus URL | metric context | optional |
 | Loki URL | log context | optional |
+| CloudWatch log group + cluster name | logs and metrics on EKS without Loki/Prometheus | optional |
 | An LLM backend | the hypothesis | see below |
 
 **The LLM is your choice, and one option costs nothing.** Run a local model
@@ -146,7 +147,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 |---|---|
 | `ingest-api` — Alertmanager webhook → Redis Streams | ✅ |
 | `analyzer-worker` — collectors, redaction, budget, dedup, alert-storm grouping, graceful degradation | ✅ |
-| Collectors — Kubernetes events, Prometheus, Loki | ✅ |
+| Collectors — Kubernetes events and pod logs, Prometheus, Loki, CloudWatch (Container Insights) | ✅ |
 | LLM backends — local Ollama, any OpenAI-compatible API (DeepSeek, Groq, vLLM…), Anthropic, offline stub | ✅ |
 | Delivery — Slack, Telegram | ✅ |
 | Incident history — Postgres, with the redacted context each hypothesis was based on (audit trail) | ✅ |
