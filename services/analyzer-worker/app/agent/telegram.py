@@ -39,6 +39,7 @@ HELP = (
     "  /ok <id> [note]       the hypothesis for incident #id was right\n"
     "  /wrong <id> <cause>   it was wrong; record the real cause so I remember\n"
     "  /index                re-index runbooks and incidents into memory\n"
+    "  /scenario <id>        export the incident as a replay scenario (a regression test for the triage)\n"
     "  /status               what I can reach right now\n"
     "  /help                 this text"
 )
@@ -262,6 +263,8 @@ class TelegramBot:
             return Reply(await self._feedback(cmd, rest))
         if cmd == "/index":
             return Reply(await self._index())
+        if cmd == "/scenario":
+            return Reply(await self._scenario(rest), mono=True)
         if cmd.startswith("/"):
             return Reply(f"Unknown command {cmd}. /help lists what I can do.")
         return Reply(await self._ask(chat_id, text))
@@ -323,6 +326,26 @@ class TelegramBot:
         if verdict == "correct":
             return f"Recorded: #{full[:8]} confirmed. Thanks."
         return f"Recorded: #{full[:8]} was wrong, real cause: {note.strip()}. I will remember it."
+
+    async def _scenario(self, arg: str) -> str:
+        """An incident becomes a benchmark scenario: paste it into scenarios/."""
+        if self._pool is None:
+            return "No incident history: the store is not postgres."
+        prefix = "".join(c for c in arg.strip().lower() if c in "0123456789abcdef")
+        if not prefix:
+            return "Usage: /scenario <id>  (the #id from an alert message)"
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, fingerprint, alertname, namespace, severity, alert_summary, root_cause, "
+                "verdict, resolution, context, created_at FROM incidents WHERE id LIKE $1 "
+                "ORDER BY created_at DESC LIMIT 1",
+                prefix + "%",
+            )
+        if row is None:
+            return f"No incident starting with #{prefix}."
+        from .scenario import scenario_json
+
+        return scenario_json(dict(row))
 
     async def _index(self) -> str:
         if self._memory is None or not self._memory.available:

@@ -53,6 +53,8 @@ _MIGRATIONS = (
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS context TEXT",
     # Alert fired → hypothesis ready, end to end; the business number.
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS time_to_hypothesis_ms INTEGER",
+    # The one-line alert summary, so an incident can be replayed as a scenario.
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS alert_summary TEXT",
 )
 
 _INDEXES = (
@@ -65,8 +67,8 @@ INSERT INTO incidents (
     id, fingerprint, alertname, namespace, severity, status,
     root_cause, confidence, blast_radius, evidence, disproof, next_steps,
     backend, cost_usd, latency_ms, failure_reason, created_at, context,
-    time_to_hypothesis_ms
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+    time_to_hypothesis_ms, alert_summary
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 ON CONFLICT (id) DO NOTHING
 """
 
@@ -142,6 +144,7 @@ class PostgresStore:
                 incident.created_at,
                 incident.context or None,
                 incident.time_to_hypothesis_ms or None,
+                incident.alert_summary or None,
             )
 
 

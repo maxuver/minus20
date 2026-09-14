@@ -165,6 +165,8 @@ def _incident(**over):
         "resolution": None,
         "resolved_at": None,
         "context": "",
+        "alert_summary": "",
+        "fingerprint": "fp1",
     }
     base.update(over)
     return base
@@ -697,6 +699,60 @@ def test_salvage_ignores_unknown_tools_and_non_calls():
     calls = salvage_tool_calls(text, {"k8s_events"})
     assert [(c.name, c.arguments) for c in calls] == [("k8s_events", {"namespace": "a"})]
     assert salvage_tool_calls("no json here", {"k8s_events"}) == []
+
+
+# ---- incident → scenario (resilience debt: every incident becomes a test) --
+
+
+def test_incident_exports_as_a_replay_scenario_with_the_verdict_as_expectation():
+    from app.agent.scenario import incident_to_scenario, parse_context
+
+    rendered = (
+        "## Kubernetes events\nWarning BackOff pod/billing-api-7f9c: Back-off restarting\n"
+        "## Metrics\npg_up{instance=\"postgres\"} = 1\n"
+        "## Logs\nFATAL could not translate host name \"postgres-v1\"\n"
+    )
+    assert parse_context(rendered)["log_lines"] == ['FATAL could not translate host name "postgres-v1"']
+    row = _incident(
+        context=rendered,
+        verdict="wrong",
+        resolution="DB_HOST env var pointed at postgres-v1, the Service is called postgres",
+        alert_summary="KubePodCrashLooping · ns=payments · severity=warning",
+    )
+    sc = incident_to_scenario(row)
+    assert sc["alert"]["labels"] == {"alertname": "KubePodCrashLooping", "severity": "warning", "namespace": "payments", "pod": "billing-api-7f9c"}
+    assert sc["context"]["k8s_events"] and sc["context"]["metrics"] and sc["context"]["log_lines"]
+    assert "db_host" in sc["expected_keywords"] and "postgres-v1" in sc["expected_keywords"]
+    assert "the" not in sc["expected_keywords"]
+    assert sc["why_hard"].startswith("The first hypothesis was 'database connection refused'")
+    # and it loads through the real replay harness
+    import json as _json
+    import tempfile
+    from pathlib import Path
+
+    from app.replay import expected_keywords, load_scenario
+
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "exported.json"
+        path.write_text(_json.dumps(sc), encoding="utf-8")
+        _name, alert, context = load_scenario(path)
+        assert alert.alertname == "KubePodCrashLooping" and len(context.log_lines) == 1
+        assert expected_keywords(path)[:1] == ["db_host"]
+
+
+def test_unreviewed_incident_exports_without_expectations():
+    from app.agent.scenario import incident_to_scenario
+
+    sc = incident_to_scenario(_incident(context="## Logs\nERROR x"))
+    assert sc["expected_keywords"] == [] and "No engineer verdict" in sc["why_hard"]
+
+
+async def test_bot_scenario_command():
+    pool = FakePool(incidents=[_incident(context="## Logs\nERROR could not connect", verdict="correct", resolution="")])
+    bot, _ = _bot(pool=pool)
+    reply = await bot.dispatch("42", "/scenario abcdef12")
+    assert reply.mono and '"name": "kubepodcrashlooping-abcdef12"' in reply.text
+    assert "No incident" in (await bot.dispatch("42", "/scenario 00000000")).text
 
 
 # ---- chat adapters (CC-39) ----------------------------------------------
