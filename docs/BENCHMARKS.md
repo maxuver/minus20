@@ -4,9 +4,9 @@ Measured, reproducible, and reported whether or not the number flatters the
 project. A tool that tells you what broke at 3 AM has to be honest about how
 often it is wrong.
 
-Last runs: 2026-09-09 with `qwen2.5:7b` via Ollama, CPU only (no GPU);
-2026-09-13 with `gemini-3.6-flash` through the OpenAI-compatible adapter
-(free tier). Cost $0.00 per alert in both.
+Last runs: 2026-09-09 and 2026-09-14 with `qwen2.5:7b` via Ollama, CPU only
+(no GPU); 2026-09-13/14 with `gemini-3.6-flash` through the OpenAI-compatible
+adapter (free tier). Cost $0.00 per alert in both.
 
 ## Method
 
@@ -32,6 +32,36 @@ they go the wrong way regardless of what the evidence contains.
 | Hard — the obvious signal points the wrong way | 5 | **2/5**, 30.3 s avg | **5/5**, 7.6 s avg |
 
 Same pipeline, same prompt, same scenarios, one environment variable changed.
+
+### 2026-09-14: the prompt asks for elimination first, and two scenarios are added
+
+The system prompt now spells out a method: name the obvious explanation,
+look for what contradicts it, discard it if contradicted; a symptom is not a
+cause when the thing it points at is shown healthy; when two things mismatch,
+suspect the one that changed. Two scenarios were added to the hard set:
+pod IP exhaustion (AWS VPC CNI, node looks healthy) and a config mismatch
+where both a wrong env var and a NetworkPolicy are visible and the error
+message names the wrong one.
+
+| Set | Scenarios | qwen2.5:7b, CPU (prompt v1) | qwen2.5:7b, CPU (prompt v2) | gemini-3.6-flash |
+|---|---|---|---|---|
+| Hard, original five | 5 | 2/5 | **3/5** (missing Secret now found) | 5/5 |
+| Hard, all seven | 7 | | **5/7**, 46 s avg | 6 of 7 distinct passes across two runs; the seventh never served |
+
+The Gemini column needs a caveat: the free tier answered 503 "high demand"
+and then 429 rate limits for most of the afternoon, so the seven-scenario
+run never completed in one pass. Across the two partial runs every scenario
+it did answer was correct (missing Secret, NetworkPolicy, rollout, sidecar,
+unrotated log, IP exhaustion); the config-mismatch scenario was never served.
+Reported as such rather than as 7/7. The replay harness gained
+`SENTINELOPS_REPLAY_PAUSE_SECONDS` for metered tiers, and the adapter retries
+429/503 twice with short delays.
+
+On the 7B model the prompt change moved one scenario from wrong to right and
+none the other way. Its config-mismatch answer, "DNS resolution failure for
+DB_HOST", passes the keyword grader by naming the variable and is still half
+wrong: it calls a symptom the cause. The grader counts it; the reader should
+not.
 
 ### Hard set, case by case
 

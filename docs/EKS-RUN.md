@@ -108,8 +108,22 @@ $ kubectl auth can-i create pods/exec --as=$sa -A   # no
 
 ## Cost
 
-By the published rates: 31 minutes of EKS control plane ($0.10/h) and NAT
-($0.045/h) from creation to deletion, two t3.small SPOT nodes for 18 minutes
-and a few GB of EBS come to roughly **$0.08–0.10**, plus a few cents of data
-transfer. The account's Cost Explorer
-figure for 2026-09-13 will be added here once it settles (billing lags a day).
+Cost Explorer, next day, for 2026-09-13 (`aws ce get-cost-and-usage`,
+`RECORD_TYPE=Usage`):
+
+| Usage type | Qty | List price |
+|---|---|---|
+| NAT gateway hours | 1.000 h | $0.0520 |
+| NAT gateway bytes | 0.740 GB | $0.0385 |
+| EKS cluster hours | 0.316 h | $0.0316 |
+| Spot t3.small | 0.329 h | $0.0034 |
+| Public IPv4 (in use + idle) | | $0.0016 |
+| EBS gp3 | 0.010 GB-month | $0.0009 |
+| **Total at list price** | | **$0.1281** |
+| Credits applied | | −$0.1281 |
+| **Billed** | | **$0.00** |
+
+The NAT gateway, not the cluster, was the largest line: an hour is the
+billing minimum, and pulling three images through it cost more in bytes than
+the control plane cost in time. For a demo that is fine; for anything
+longer-lived, pull images through a VPC endpoint or keep nodes public.

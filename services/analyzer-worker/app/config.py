@@ -102,6 +102,9 @@ class Settings(BaseSettings):
     mcp_transport: str = "stdio"  # "stdio" (local CLI) | "http" (in-cluster Service)
     mcp_port: int = 8765
 
+    # Seconds to wait between replay scenarios (benchmarks on metered free tiers).
+    replay_pause_seconds: float = 0.0
+
     log_level: str = "INFO"
 
     model_config = {"env_prefix": "SENTINELOPS_"}

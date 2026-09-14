@@ -36,3 +36,26 @@ def describe(exc: BaseException) -> str:
         text = _MDN_CLAUSE.sub("", _URL_CLAUSE.sub("", text))
     text = redact(text)
     return text if len(text) <= MAX_LEN else text[: MAX_LEN - 1] + "…"
+
+
+RETRY_STATUSES = frozenset({429, 503})
+RETRY_DELAYS = (2.0, 5.0)  # two retries, seven seconds at most, inside the call timeout
+
+
+async def post_with_retry(client, path: str, payload: dict):
+    """POST, retrying only on the two statuses that mean 'not now': 429 and 503.
+
+    Gemini's free tier answered "This model is currently experiencing high
+    demand" (503) on and off for an hour on 2026-09-14; a one-shot call turned
+    every such blip into a failed analysis. Anything else raises at once.
+    """
+    import asyncio
+
+    for delay in (*RETRY_DELAYS, None):
+        resp = await client.post(path, json=payload)
+        if resp.status_code in RETRY_STATUSES and delay is not None:
+            await asyncio.sleep(delay)
+            continue
+        resp.raise_for_status()
+        return resp
+    return resp  # pragma: no cover - loop always returns or raises

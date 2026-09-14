@@ -1,0 +1,48 @@
+{
+  "name": "config-mismatch-wrong-side",
+  "why_hard": "Two things disagree and both are visible: the pod's DB_HOST env var says postgres-v1 while the Service is called postgres, and a NetworkPolicy also exists. The loud signal is 'could not resolve postgres-v1', which invites 'DNS' or 'NetworkPolicy'. The Service, CoreDNS and the policy are all fine; the deployment that changed an hour ago is the one that introduced the wrong hostname. The correct fix is the env var, not the Service, not DNS, not the policy. An investigator that surfaces both mismatches but blames the wrong side sends the engineer on a second investigation.",
+  "expected_keywords": ["db_host", "env", "environment", "postgres-v1", "hostname", "configuration", "config"],
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "KubePodCrashLooping",
+      "namespace": "billing",
+      "pod": "invoice-api-6c9d8b7f5-t3k2m",
+      "container": "invoice-api",
+      "severity": "critical"
+    },
+    "annotations": {
+      "description": "Pod billing/invoice-api is in CrashLoopBackOff.",
+      "summary": "Pod is crash looping."
+    },
+    "startsAt": "2026-09-14T09:12:20Z",
+    "fingerprint": "h7d8e9f0a1b2c3d4"
+  },
+  "context": {
+    "k8s_events": [
+      "Warning BackOff pod/invoice-api-6c9d8b7f5-t3k2m x14: Back-off restarting failed container invoice-api",
+      "Normal ScalingReplicaSet deployment/invoice-api: Scaled up replica set invoice-api-6c9d8b7f5 from 0 to 3",
+      "Normal ScalingReplicaSet deployment/invoice-api: Scaled down replica set invoice-api-58f4c6d9b from 3 to 0",
+      "Normal Pulled pod/invoice-api-6c9d8b7f5-t3k2m: Container image \"registry.internal/invoice-api:2.9.0\" already present on machine"
+    ],
+    "metrics": [
+      "kube_pod_container_status_restarts_total{pod=\"invoice-api-6c9d8b7f5-t3k2m\"} = 14",
+      "kube_deployment_status_replicas_available{deployment=\"invoice-api\"} = 0",
+      "kube_service_info{namespace=\"billing\",service=\"postgres\",cluster_ip=\"10.96.41.7\"} = 1",
+      "kube_pod_container_status_ready{namespace=\"billing\",pod=\"postgres-0\"} = 1",
+      "pg_up{instance=\"postgres.billing.svc:5432\"} = 1",
+      "coredns_dns_responses_total{rcode=\"NXDOMAIN\",zone=\"billing.svc.cluster.local\"} = 1462",
+      "coredns_dns_responses_total{rcode=\"NOERROR\",zone=\"billing.svc.cluster.local\"} = 88213",
+      "kube_networkpolicy_labels{namespace=\"billing\",networkpolicy=\"allow-db\"} = 1",
+      "kube_pod_container_info{pod=\"invoice-api-6c9d8b7f5-t3k2m\",container=\"invoice-api\",image=\"registry.internal/invoice-api:2.9.0\"} = 1",
+      "kube_pod_container_env_info{pod=\"invoice-api-6c9d8b7f5-t3k2m\",name=\"DB_HOST\",value=\"postgres-v1\"} = 1",
+      "kube_pod_container_env_info{pod=\"invoice-api-58f4c6d9b-p8q1z\",name=\"DB_HOST\",value=\"postgres\"} = 1"
+    ],
+    "log_lines": [
+      "invoice-api 2.9.0 starting, DB_HOST=postgres-v1",
+      "FATAL could not translate host name \"postgres-v1\" to address: Name or service not known",
+      "checkout-worker: connected to postgres.billing.svc:5432 (pool=8)",
+      "coredns: [INFO] 10.244.2.19:44710 - 5124 \"A IN postgres-v1.billing.svc.cluster.local. udp\" NXDOMAIN"
+    ]
+  }
+}

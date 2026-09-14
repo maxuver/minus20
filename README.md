@@ -156,7 +156,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark | ✅ [results](docs/BENCHMARKS.md) |
 | CI — lint, tests, container build, helm lint, SAST, dependency scan, secret scan of full history | ✅ |
-| Terraform for AWS EKS | ✅ applied to real AWS on 2026-09-13, chart installed from GHCR, real incident analysed, destroyed 18 min later — [proof](docs/EKS-RUN.md) |
+| Terraform for AWS EKS | ✅ applied to real AWS on 2026-09-13, chart installed from GHCR, real incident analysed, destroyed 18 min later, $0.13 at list price — [proof](docs/EKS-RUN.md) |
 
 ### Known limitations
 
@@ -166,7 +166,7 @@ Stated plainly, because you will find them anyway:
   ClusterIP on purpose; reach it with `kubectl port-forward`, do not expose it.
 - **No multi-tenancy.** Single team, single cluster.
 - **Accuracy depends on the model, and it is measured.** With the local 7B
-  model: 6/6 on plainly-stated scenarios, 2/5 on scenarios built to mislead.
+  model: 6/6 on plainly-stated scenarios, 5/7 on scenarios built to mislead.
   With a current cloud model through the same pipeline: 6/6 and 5/5, in 7 s.
   Method and case-by-case results: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
   Nothing has been measured against real production incidents yet.

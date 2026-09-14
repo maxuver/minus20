@@ -112,7 +112,11 @@ async def run_all_graded(
     backend = get_backend(cfg)
     budget = InMemoryBudget(cfg.daily_budget_usd)
     results: list[tuple[Incident, bool | None]] = []
-    for path in sorted(scenarios_dir.glob("*.json")):
+    for i, path in enumerate(sorted(scenarios_dir.glob("*.json"))):
+        if i and cfg.replay_pause_seconds:
+            # Free API tiers meter requests per minute; back-to-back scenarios
+            # turned into 429s on Gemini's free tier (2026-09-14).
+            await asyncio.sleep(cfg.replay_pause_seconds)
         _name, alert, context = load_scenario(path)
         incident = await run_scenario(alert, context, backend, budget, cfg)
         results.append((incident, grade(incident, expected_keywords(path))))

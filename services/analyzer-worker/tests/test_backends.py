@@ -244,3 +244,68 @@ def test_describe_strips_url_clauses_and_redacts():
     assert "AAHVJEmQlOanKaS9SWyRphHOCwWMp5YsETc" not in out
     assert "for url" not in out and "mozilla" not in out
     assert out.startswith("RuntimeError: Client error '400 Bad Request'")
+
+
+async def test_openai_backend_retries_503_then_succeeds(monkeypatch):
+    import asyncio as _asyncio
+
+    from app import errors
+
+    slept = []
+
+    async def fake_sleep(d):
+        slept.append(d)
+
+    monkeypatch.setattr(_asyncio, "sleep", fake_sleep)
+    attempts = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            return httpx.Response(503, json=[{"error": {"code": 503, "message": "high demand"}}])
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": GOOD_JSON}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}},
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://p/v1")
+    result = await OpenAICompatibleBackend(Settings(), client=client).analyze("prompt")
+    assert result.hypothesis.root_cause == "container OOMKilled"
+    assert attempts["n"] == 3
+    assert slept == list(errors.RETRY_DELAYS)
+    await client.aclose()
+
+
+async def test_openai_backend_gives_up_after_bounded_retries(monkeypatch):
+    import asyncio as _asyncio
+
+    async def fake_sleep(d):
+        pass
+
+    monkeypatch.setattr(_asyncio, "sleep", fake_sleep)
+    attempts = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts["n"] += 1
+        return httpx.Response(503, json=[{"error": {"message": "high demand"}}])
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://p/v1")
+    with pytest.raises(BackendError) as info:
+        await OpenAICompatibleBackend(Settings(), client=client).analyze("prompt")
+    assert attempts["n"] == 3  # one call plus two retries, never more
+    assert "HTTP 503" in str(info.value)
+    await client.aclose()
+
+
+async def test_openai_backend_does_not_retry_other_errors():
+    attempts = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts["n"] += 1
+        return httpx.Response(401, json={"error": "bad key"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://p/v1")
+    with pytest.raises(BackendError):
+        await OpenAICompatibleBackend(Settings(), client=client).analyze("prompt")
+    assert attempts["n"] == 1
+    await client.aclose()

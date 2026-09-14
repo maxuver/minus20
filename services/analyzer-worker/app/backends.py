@@ -21,7 +21,7 @@ import json
 import re
 
 from .config import Settings, settings
-from .errors import describe
+from .errors import describe, post_with_retry
 from .models import Hypothesis, LLMResult
 from .ports import BackendError
 
@@ -235,8 +235,7 @@ class OpenAICompatibleBackend:
             ],
         }
         try:
-            resp = await client.post("/chat/completions", json=payload)
-            resp.raise_for_status()
+            resp = await post_with_retry(client, "/chat/completions", payload)
             data = resp.json()
         except Exception as exc:
             raise BackendError(f"openai-compatible call failed: {describe(exc)}") from exc
