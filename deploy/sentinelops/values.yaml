@@ -25,6 +25,10 @@ postgres:
   database: sentinelops
   password: sentinel # demo default; override in any real deployment
   storage: 2Gi
+  # Empty = the cluster's default StorageClass. EKS ships gp2 but does NOT
+  # mark it default, so the PVC stays Pending forever there: set gp2 (or a
+  # gp3 class you created). Seen on the second real EKS run, 2026-09-14.
+  storageClass: ""
 
 # Runtime configuration (SENTINELOPS_* env). Safe offline defaults: the stub
 # backend needs no API key, and the k8s-events collector reads live cluster

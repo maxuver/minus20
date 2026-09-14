@@ -37,6 +37,9 @@ metadata:
     {{- include "sentinelops.labels" . | nindent 4 }}
 spec:
   accessModes: ["ReadWriteOnce"]
+  {{- if .Values.postgres.storageClass }}
+  storageClassName: {{ .Values.postgres.storageClass | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.postgres.storage }}

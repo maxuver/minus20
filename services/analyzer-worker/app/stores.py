@@ -73,6 +73,32 @@ ON CONFLICT (id) DO NOTHING
 """
 
 
+async def connect_pool(dsn: str, attempts: int = 30, delay: float = 3.0):  # pragma: no cover - real DB path
+    """Create the asyncpg pool, waiting for the database to accept connections.
+
+    On a fresh cluster Postgres comes up after the worker (and on EKS its
+    volume can take minutes). Crash-looping until it is there works, but
+    burns restarts and backoff; waiting up to ~90 s is the same outcome
+    without the noise.
+    """
+    import asyncio
+    import logging
+
+    import asyncpg
+
+    log = logging.getLogger("analyzer-worker.stores")
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            return await asyncpg.create_pool(dsn)
+        except (OSError, asyncpg.PostgresError) as exc:
+            last = exc
+            if i == 0:
+                log.warning("postgres not ready (%s); waiting", type(exc).__name__)
+            await asyncio.sleep(delay)
+    raise RuntimeError(f"postgres never became ready: {last}")
+
+
 async def ensure_incidents_schema(conn) -> None:
     """Create or migrate the incidents table. Idempotent; shared with the agent."""
     await conn.execute(_SCHEMA)
@@ -102,9 +128,7 @@ class PostgresStore:
 
     async def _get_pool(self):
         if self._pool is None:  # pragma: no cover - real DB path
-            import asyncpg
-
-            self._pool = await asyncpg.create_pool(self._dsn)
+            self._pool = await connect_pool(self._dsn)
         return self._pool
 
     async def ensure_schema(self) -> None:

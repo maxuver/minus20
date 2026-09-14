@@ -156,7 +156,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark | ✅ [results](docs/BENCHMARKS.md) |
 | CI — lint, tests, container build + CVE scan, helm lint, SAST, dependency scan, secret scan of full history, signed provenance + SBOM per image | ✅ |
-| Terraform for AWS EKS | ✅ applied to real AWS on 2026-09-13, chart installed from GHCR, real incident analysed, destroyed 18 min later, $0.13 at list price — [proof](docs/EKS-RUN.md) |
+| Terraform for AWS EKS | ✅ two real runs (2026-09-13/14): chart from GHCR, Postgres on EBS, MCP, real incidents, destroyed the same session, ~$0.13 each at list price — [proof](docs/EKS-RUN.md) |
 
 ### Known limitations
 

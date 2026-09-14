@@ -28,9 +28,9 @@ async def build() -> TelegramBot:
     pool = None
     memory = None
     if cfg.store.lower() == "postgres":
-        import asyncpg
+        from ..stores import connect_pool
 
-        pool = await asyncpg.create_pool(cfg.postgres_dsn)
+        pool = await connect_pool(cfg.postgres_dsn)
         memory = Memory(pool, OllamaEmbedder(cfg), cfg)
         if await memory.ensure_schema():
             try:

@@ -171,4 +171,5 @@ kind delete cluster --name sentinelops
 - The agent is silent: `kubectl -n sentinelops logs deploy/so-agent`; the
   chat id must be in the allow-list, and a photo needs the vision model pulled.
 - Pods Pending on a cloud cluster: the Postgres PVC needs a volume driver
-  (on EKS, the EBS CSI add-on; see `infra/terraform/addons.tf`).
+  (on EKS, the EBS CSI add-on; see `infra/terraform/addons.tf`) **and** a
+  StorageClass: EKS's `gp2` is not the default, so `--set postgres.storageClass=gp2`.

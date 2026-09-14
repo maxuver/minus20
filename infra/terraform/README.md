@@ -11,8 +11,9 @@ Applied to a real AWS account once, on 2026-09-13: 62 resources in 13 minutes,
 the published chart installed from GHCR, a real incident analysed on the
 cluster, everything destroyed 18 minutes later, about ten cents. The full
 record, including what went wrong, is in [`docs/EKS-RUN.md`](../../docs/EKS-RUN.md).
-The EBS CSI add-on was added afterwards (`addons.tf`) and has been validated
-but not yet applied. Applying is intentionally ephemeral: apply, deploy the
+The EBS CSI add-on (`addons.tf`) was applied on the second run, 2026-09-14,
+and Postgres bound a real EBS volume; note that EKS's `gp2` StorageClass is
+not marked default, so the chart needs `--set postgres.storageClass=gp2`. Applying is intentionally ephemeral: apply, deploy the
 Helm chart, demo, then `destroy`, to keep the bill to cents. The same
 [`deploy/sentinelops`](../../deploy/sentinelops) Helm chart runs unchanged on
 this cluster and on local kind, so nothing about the application layer is

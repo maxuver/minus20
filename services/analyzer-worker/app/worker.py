@@ -14,6 +14,7 @@ import json
 import logging
 
 import redis.asyncio as redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
 from .analyzer import Analyzer
@@ -42,7 +43,17 @@ class Worker:
         self._stopping = True
 
     async def ensure_group(self) -> None:
-        """Create the consumer group idempotently (tolerate BUSYGROUP)."""
+        """Create the consumer group idempotently (tolerate BUSYGROUP), waiting
+        for Redis to accept connections first: on a fresh cluster it usually
+        comes up after the worker."""
+        for i in range(30):
+            try:
+                await self._redis.ping()
+                break
+            except (RedisConnectionError, OSError) as exc:  # redis' ConnectionError is not the builtin
+                if i == 0:
+                    logger.warning("redis not ready (%s); waiting", type(exc).__name__)
+                await asyncio.sleep(3)
         try:
             await self._redis.xgroup_create(
                 self._cfg.alerts_stream, self._cfg.consumer_group, id="0", mkstream=True
