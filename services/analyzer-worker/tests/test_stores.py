@@ -76,7 +76,7 @@ async def test_postgres_store_creates_schema_then_inserts():  # CC-29
     assert ["OOMKilling event x3"] in args
     assert "check memory below limit at alert time" in args
     assert ["raise the limit"] in args
-    assert len(args) == 20  # …the redacted context, alert→hypothesis time, and the alert summary
+    assert len(args) == 22  # …context, alert→hypothesis time, alert summary, storm bookkeeping
 
 
 async def test_postgres_store_creates_schema_only_once():

@@ -21,7 +21,15 @@ import time
 from datetime import datetime, timezone
 
 from .models import Incident, IncidentStatus, StreamAlert
-from .ports import Budget, Collector, Deduplicator, IncidentStore, LLMBackend, Notifier
+from .ports import (
+    Budget,
+    Collector,
+    Deduplicator,
+    IncidentStore,
+    LLMBackend,
+    Notifier,
+    StormTracker,
+)
 from .prompt import build_prompt
 from .redaction import redact_bundle
 
@@ -38,6 +46,7 @@ class Analyzer:
         budget: Budget,
         llm_timeout_seconds: float = 30.0,
         deduplicator: Deduplicator | None = None,
+        storm_tracker: StormTracker | None = None,
     ) -> None:
         self._collector = collector
         self._backend = backend
@@ -46,6 +55,7 @@ class Analyzer:
         self._budget = budget
         self._timeout = llm_timeout_seconds
         self._dedup = deduplicator
+        self._storm = storm_tracker
 
     async def analyze(self, alert: StreamAlert, *, skip_dedup: bool = False) -> Incident:
         incident = Incident(
@@ -66,6 +76,25 @@ class Analyzer:
             incident.status = IncidentStatus.DUPLICATE_SUPPRESSED
             logger.info("suppressed duplicate alert=%s fp=%s", alert.alertname, alert.fingerprint)
             return incident
+
+        # A storm member is recorded and counted, never analysed: the leader's
+        # hypothesis already covers the shared cause, and thirty model calls
+        # for thirty pods would say the same thing thirty times.
+        if self._storm is not None:
+            state = await self._storm.track(alert, incident.id)
+            if not state.leader:
+                incident.status = IncidentStatus.GROUPED
+                incident.grouped_into = state.leader_id
+                incident.storm_size = state.count
+                incident.storm_pods = list(state.pods)
+                await self._store.save(incident)
+                if state.notify:
+                    await self._notifier.notify(incident)
+                logger.info(
+                    "storm alert=%s ns=%s size=%d leader=%s notified=%s",
+                    alert.alertname, alert.namespace, state.count, state.leader_id[:8], state.notify,
+                )
+                return incident
 
         # Collect and redact BEFORE anything leaves the process.
         raw_context = await self._collector.collect(alert)

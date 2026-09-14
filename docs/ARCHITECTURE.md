@@ -64,8 +64,10 @@ second.
 
 1. Alertmanager POSTs the alert. `ingest-api` validates it with Pydantic and
    publishes it to a length-capped Redis Stream. Nothing else is parsed here.
-2. The worker reads it through a consumer group, checks the dedup window,
-   and runs the collectors: Kubernetes events (`kubectl describe`-level),
+2. The worker reads it through a consumer group, checks the dedup window
+   (the same alert again) and the storm window (a different pod, same
+   alertname and namespace, moments later: recorded and counted as a member
+   of the first incident, not analysed), and runs the collectors: Kubernetes events (`kubectl describe`-level),
    PromQL instant queries, LogQL over a bounded window. Fixed set, small caps.
 3. **Redaction** masks e-mails, IPs, tokens, cloud keys and secret-shaped
    values in everything collected. It runs before any model call and has no

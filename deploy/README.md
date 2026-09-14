@@ -148,6 +148,16 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 Neither credential ever goes into `values.yaml` or the ConfigMap. A Slack
 webhook URL *is* the credential — anyone holding it can post to the channel.
 
+## Alert storms
+
+A node dies or a bad rollout lands and thirty pods fire the same alert. The
+first one in a namespace is analysed as usual; the rest inside
+`config.stormWindowSeconds` (default 120) are recorded as members of that
+incident and never sent to the model. The chat gets one hypothesis and then
+"⚡ Alert storm: 5 pods so far … analysed once as #id" at 2, 5, 10, 25, 50
+and so on. Measured on kind: one webhook with five alerts, one model call,
+three messages instead of five analyses.
+
 ## Real LLM backend
 
 Selecting a backend is one value; the code never changes (ADR-0002).

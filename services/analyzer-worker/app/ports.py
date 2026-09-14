@@ -48,6 +48,11 @@ class Deduplicator(Protocol):
     async def is_duplicate(self, alert: StreamAlert) -> bool: ...
 
 
+@runtime_checkable
+class StormTracker(Protocol):
+    async def track(self, alert: StreamAlert, incident_id: str): ...
+
+
 class BackendError(RuntimeError):
     """Raised by an LLM backend when it cannot produce a hypothesis.
 

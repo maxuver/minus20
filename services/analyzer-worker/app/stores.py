@@ -55,6 +55,9 @@ _MIGRATIONS = (
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS time_to_hypothesis_ms INTEGER",
     # The one-line alert summary, so an incident can be replayed as a scenario.
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS alert_summary TEXT",
+    # Storm members point at their leader; the size is the count at write time.
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS grouped_into TEXT",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS storm_size INTEGER",
 )
 
 _INDEXES = (
@@ -67,8 +70,8 @@ INSERT INTO incidents (
     id, fingerprint, alertname, namespace, severity, status,
     root_cause, confidence, blast_radius, evidence, disproof, next_steps,
     backend, cost_usd, latency_ms, failure_reason, created_at, context,
-    time_to_hypothesis_ms, alert_summary
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+    time_to_hypothesis_ms, alert_summary, grouped_into, storm_size
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 ON CONFLICT (id) DO NOTHING
 """
 
@@ -169,6 +172,8 @@ class PostgresStore:
                 incident.context or None,
                 incident.time_to_hypothesis_ms or None,
                 incident.alert_summary or None,
+                incident.grouped_into or None,
+                incident.storm_size or None,
             )
 
 

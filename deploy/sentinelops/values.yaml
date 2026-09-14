@@ -47,6 +47,10 @@ config:
   # Desktop the host via http://host.docker.internal:11434.
   ollamaUrl: http://ollama:11434
   ollamaModel: qwen2.5:7b
+  # Alert storms: different pods with the same alertname in one namespace
+  # inside this window are folded into the first incident. One model call per
+  # storm; the chat gets a count at 2, 5, 10, 25, 50... instead of N messages.
+  stormWindowSeconds: 120
   # Hard ceiling on one analysis call. A 7B model on CPU needs 30-60s; a cloud
   # model answers in a few seconds. Past it the raw alert is still delivered.
   llmTimeoutSeconds: 90

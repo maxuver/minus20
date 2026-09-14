@@ -145,7 +145,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Area | State |
 |---|---|
 | `ingest-api` — Alertmanager webhook → Redis Streams | ✅ |
-| `analyzer-worker` — collectors, redaction, budget, dedup, graceful degradation | ✅ |
+| `analyzer-worker` — collectors, redaction, budget, dedup, alert-storm grouping, graceful degradation | ✅ |
 | Collectors — Kubernetes events, Prometheus, Loki | ✅ |
 | LLM backends — local Ollama, any OpenAI-compatible API (DeepSeek, Groq, vLLM…), Anthropic, offline stub | ✅ |
 | Delivery — Slack, Telegram | ✅ |

@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # same fingerprint again costs money and spams the engineer, so suppress
     # repeats inside this window (default 1h, matching a typical repeat_interval).
     dedup_window_seconds: int = 3600
+    # Alert storms: different pods, same alertname+namespace, within this
+    # window are folded into the first incident (the leader). One model call
+    # per storm; the engineer is told the count at a few thresholds.
+    storm_window_seconds: int = 120
 
     # --- persistence (ADR-0002: only post-redaction data is stored) ---
     store: str = "memory"  # "memory" | "postgres"

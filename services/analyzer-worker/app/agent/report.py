@@ -33,6 +33,7 @@ SELECT count(*)                                              AS total,
        count(*) FILTER (WHERE status = 'analyzed')           AS analyzed,
        count(*) FILTER (WHERE status = 'analysis_failed')    AS failed,
        count(*) FILTER (WHERE status = 'budget_exceeded')    AS over_budget,
+       count(*) FILTER (WHERE status = 'grouped')            AS grouped,
        count(*) FILTER (WHERE severity = 'critical')         AS critical,
        count(*) FILTER (WHERE verdict = 'correct')           AS confirmed,
        count(*) FILTER (WHERE verdict = 'wrong')             AS refuted,
@@ -167,6 +168,9 @@ def render(data: ReportData) -> str:
         lines.append("")
         lines.append("Nothing happened in this period. Good week.")
         return "\n".join(lines)
+    grouped = int(t.get("grouped") or 0)
+    if grouped:
+        lines.append(f"Alert storms: {grouped} alerts folded into their leaders (recorded, not re-analysed)")
 
     confirmed, refuted = int(t.get("confirmed") or 0), int(t.get("refuted") or 0)
     if confirmed + refuted:

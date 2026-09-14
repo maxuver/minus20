@@ -108,6 +108,9 @@ class IncidentStatus(str, Enum):
     ANALYSIS_FAILED = "analysis_failed"
     BUDGET_EXCEEDED = "budget_exceeded"
     DUPLICATE_SUPPRESSED = "duplicate_suppressed"
+    # A member of an alert storm: same alertname+namespace as an incident
+    # analysed moments ago (the leader). Recorded and counted, not analysed.
+    GROUPED = "grouped"
 
 
 class Incident(BaseModel):
@@ -131,6 +134,11 @@ class Incident(BaseModel):
     # hypothesis being ready. latency_ms is only the model call; this is the
     # number an engineering manager asks for. 0 when the alert has no startsAt.
     time_to_hypothesis_ms: int = 0
+    # Storm bookkeeping: the leader incident this one was folded into, and how
+    # many alerts the storm holds at the moment this record was written.
+    grouped_into: str = ""
+    storm_size: int = 0
+    storm_pods: list[str] = Field(default_factory=list)
     # Exactly what the model was shown, after redaction: the audit trail for
     # "what did it see when it said that". Empty when analysis never ran.
     context: str = ""

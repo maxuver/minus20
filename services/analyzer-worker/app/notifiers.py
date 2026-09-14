@@ -82,6 +82,16 @@ def format_message(incident: Incident) -> str:
             f"{_ttfh(incident)} · ${incident.cost_usd:.4f} · #{incident.id[:8]}</i>"
         )
 
+    elif incident.status is IncidentStatus.GROUPED:
+        lines.append("")
+        lines.append(f"⚡ <b>Alert storm:</b> {incident.storm_size} pods so far with this alert")
+        if incident.storm_pods:
+            shown = ", ".join(escape(p) for p in incident.storm_pods[:8])
+            more = "" if len(incident.storm_pods) <= 8 else f" +{len(incident.storm_pods) - 8} more"
+            lines.append(f"<code>{shown}</code>{escape(more)}")
+        lines.append(f"<i>Analysed once as #{incident.grouped_into[:8]}; one shared cause is likely "
+                     "(node, rollout, dependency). Members are recorded, not re-analysed.</i>")
+
     elif incident.status is IncidentStatus.BUDGET_EXCEEDED:
         lines.append("")
         lines.append("⚠️ <b>AI analysis skipped</b> — daily budget reached.")
@@ -145,6 +155,18 @@ def format_slack_blocks(incident: Incident) -> list[dict]:
             f"${incident.cost_usd:.4f} · #{incident.id[:8]}"
         )
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": footer}]})
+
+    elif incident.status is IncidentStatus.GROUPED:
+        pods = ", ".join(esc(p) for p in incident.storm_pods[:8])
+        more = "" if len(incident.storm_pods) <= 8 else f" +{len(incident.storm_pods) - 8} more"
+        blocks.append(
+            _section(
+                f"*Alert storm:* {incident.storm_size} pods so far with this alert"
+                + (f"\n`{pods}`{more}" if pods else "")
+                + f"\n_Analysed once as #{incident.grouped_into[:8]}; one shared cause is likely "
+                "(node, rollout, dependency). Members are recorded, not re-analysed._"
+            )
+        )
 
     elif incident.status is IncidentStatus.BUDGET_EXCEEDED:
         blocks.append(
