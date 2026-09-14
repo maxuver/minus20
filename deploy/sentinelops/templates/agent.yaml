@@ -36,7 +36,7 @@ spec:
                 name: {{ .Release.Name }}-config
           env:
             - name: SENTINELOPS_TELEGRAM_CHAT_ID
-              value: {{ .Values.agent.telegramChatId | default .Values.config.telegramChatId | quote }}
+              value: {{ include "sentinelops.chatId" (.Values.agent.telegramChatId | default .Values.config.telegramChatId) | quote }}
             - name: SENTINELOPS_TELEGRAM_BOT_TOKEN
               valueFrom:
                 secretKeyRef:

@@ -543,6 +543,23 @@ def _update(chat_id, text):
     return {"update_id": 1, "message": {"chat": {"id": chat_id}, "text": text}}
 
 
+async def test_allow_list_accepts_a_chat_id_that_became_a_float():
+    """Helm --reuse-values turned 194698214 into 1.94698214e+08; same chat."""
+    chat = FakeChat([ChatTurn(content="answer")])
+    cfg = Settings(telegram_chat_id="1.94698214e+08, -100123456789")
+    agent = Agent(chat, tools.ToolContext(cfg=cfg), InMemoryBudget(1.0), cfg)
+    sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.path)
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://tg/botTOKEN")
+    bot = TelegramBot(cfg, agent, chat, None, None, client=client)
+    assert bot._allowed == {"194698214", "-100123456789"}
+    assert (await bot.handle(_update(194698214, "/help"))) is not None
+
+
 async def test_bot_ignores_chats_not_on_the_allow_list():
     bot, sent = _bot()
     assert await bot.handle(_update(999, "/help")) is None

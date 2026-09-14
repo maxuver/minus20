@@ -56,6 +56,21 @@ TRANSCRIBE_PROMPT = (
 )
 
 
+def _chat_id(raw: str) -> str:
+    """Normalise a chat id: '1.94698214e+08' (a float that went through Helm
+    or YAML) and '194698214' are the same chat. Seen live 2026-09-14: the bot
+    ignored its own owner for three hours."""
+    raw = raw.strip()
+    try:
+        return str(int(raw))
+    except ValueError:
+        pass
+    try:
+        return str(int(float(raw)))
+    except ValueError:
+        return raw
+
+
 @dataclass
 class Reply:
     text: str
@@ -80,7 +95,7 @@ class TelegramBot:
         self._pool = pool
         self._client = client
         self._runbooks_dir = runbooks_dir
-        self._allowed = {c.strip() for c in cfg.telegram_chat_id.split(",") if c.strip()}
+        self._allowed = {_chat_id(c) for c in cfg.telegram_chat_id.split(",") if c.strip()}
         self._history: dict[str, list[dict]] = {}
         self._offset = 0
 
