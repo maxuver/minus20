@@ -200,3 +200,51 @@ async def test_loki_respects_line_cap():
     bundle = await collector.collect(StreamAlert(labels={"namespace": "demo"}))
     assert len(bundle.log_lines) == 5
     await client.aclose()
+
+
+async def test_k8s_logs_collector_reads_previous_then_current(alert):
+    from app.collectors import K8sPodLogsCollector
+
+    class Api:
+        async def read_namespaced_pod_log(self, pod, ns, tail_lines, previous):
+            assert (pod, ns) == ("billing-api-7f9c6d5b8-x2j4q", "demo")
+            return "ERROR could not connect to postgres:5432\npanic: db unavailable" if previous else "starting"
+
+    bundle = await K8sPodLogsCollector(api=Api(), tail_lines=10).collect(alert)
+    assert bundle.sources_ok == ["k8s-logs"]
+    assert bundle.log_lines[0].startswith("--- previous container")
+    assert "postgres:5432" in "\n".join(bundle.log_lines)
+    assert any(l.startswith("--- current container") for l in bundle.log_lines)
+
+
+async def test_k8s_logs_collector_tolerates_a_pod_without_previous_container(alert):
+    from app.collectors import K8sPodLogsCollector
+
+    class Api:
+        async def read_namespaced_pod_log(self, pod, ns, tail_lines, previous):
+            if previous:
+                raise RuntimeError("previous terminated container not found")
+            return "healthy so far"
+
+    bundle = await K8sPodLogsCollector(api=Api()).collect(alert)
+    assert bundle.log_lines[-1] == "healthy so far"
+
+
+async def test_k8s_logs_collector_skips_alerts_without_a_pod():
+    from app.collectors import K8sPodLogsCollector
+    from app.models import StreamAlert
+
+    class Api:
+        async def read_namespaced_pod_log(self, *a, **k):
+            raise AssertionError("must not be called")
+
+    bundle = await K8sPodLogsCollector(api=Api()).collect(StreamAlert(labels={"alertname": "NodeNotReady"}))
+    assert bundle.log_lines == [] and bundle.sources_ok == ["k8s-logs"]
+
+
+def test_k8s_logs_collector_is_selectable_by_config():
+    from app.collectors import K8sPodLogsCollector, get_collector
+    from app.config import Settings
+
+    agg = get_collector(Settings(collectors="k8s-events,k8s-logs"))
+    assert any(isinstance(c, K8sPodLogsCollector) for c in agg._collectors)

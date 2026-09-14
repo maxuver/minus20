@@ -35,6 +35,23 @@ kubectl -n sentinelops logs deploy/so-analyzer-worker | tail
 # -> incident alert=KubePodCrashLooping status=analyzed backend=stub ...
 ```
 
+## Verify what you are about to run
+
+Every image on GHCR carries a signed SLSA build provenance attestation: proof
+that this exact digest was built by this repository's public workflow from a
+specific commit, not on someone's laptop. Verify before the first install:
+
+```bash
+gh attestation verify oci://ghcr.io/maxuver/sentinelops/analyzer-worker:latest --owner maxuver
+gh attestation verify oci://ghcr.io/maxuver/sentinelops/ingest-api:latest --owner maxuver
+gh attestation verify oci://ghcr.io/maxuver/sentinelops/web-ui:latest --owner maxuver
+```
+
+Each CI run also publishes an SBOM (SPDX) per image as a workflow artifact,
+and the build fails on any CRITICAL or HIGH vulnerability with a fix
+available (Trivy). The source is public, the Dockerfiles are five lines, and
+the RBAC below is the whole set of permissions the software holds.
+
 ## RBAC (least privilege)
 
 The ServiceAccount shared by the worker and the agent can only read: events,

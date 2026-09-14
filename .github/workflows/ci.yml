@@ -58,9 +58,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build services/ingest-api
-      - run: docker build services/analyzer-worker
-      - run: docker build services/web-ui
+      - run: docker build -t local/ingest-api services/ingest-api
+      - run: docker build -t local/analyzer-worker services/analyzer-worker
+      - run: docker build -t local/web-ui services/web-ui
+      # Image vulnerability scan (OS packages + Python deps inside the image).
+      # A CRITICAL or HIGH finding with a fix available fails the build, so an
+      # image with a known exploitable hole is never published.
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: local/analyzer-worker
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: local/ingest-api
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: local/web-ui
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
 
   helm:
     runs-on: ubuntu-latest
@@ -101,6 +125,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # for the signed build provenance below
+      attestations: write
     strategy:
       # GHCR occasionally answers a push with "unknown blob"; one flaky push
       # must not cancel the other two images (seen on 5c8ead4).
@@ -115,6 +141,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: services/${{ matrix.service }}
           push: true
@@ -126,6 +153,23 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=AGPL-3.0
+      # Signed SLSA build provenance: cryptographic proof that this exact
+      # image digest was built by this workflow from this commit. Anyone can
+      # check it before running the image:
+      #   gh attestation verify oci://ghcr.io/maxuver/sentinelops/analyzer-worker:latest --owner maxuver
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      # Software bill of materials: every package inside the image, as a
+      # downloadable artifact, so a security team can read it instead of
+      # trusting a README.
+      - uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository }}/${{ matrix.service }}@${{ steps.build.outputs.digest }}
+          artifact-name: sbom-${{ matrix.service }}.spdx.json
+          output-file: sbom-${{ matrix.service }}.spdx.json
 
   # Publish the chart itself as an OCI artifact, so a user can
   #   helm install so oci://ghcr.io/maxuver/charts/sentinelops

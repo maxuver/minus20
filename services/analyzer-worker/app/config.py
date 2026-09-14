@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # analysis, so a slow-but-alive consumer is never robbed of its message.
     reclaim_idle_ms: int = 120_000
 
-    # --- context collectors (comma-separated: stub, k8s-events, prometheus, loki) ---
+    # --- context collectors (comma-separated: stub, k8s-events, k8s-logs, prometheus, loki) ---
     # Fixed in config, not chosen by the model at runtime (ADR-0001).
     collectors: str = "stub"
     k8s_max_events: int = 20

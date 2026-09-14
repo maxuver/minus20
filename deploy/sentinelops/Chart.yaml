@@ -2,8 +2,8 @@ apiVersion: v2
 name: sentinelops
 description: AI-assisted incident triage for Kubernetes (ingest-api, analyzer-worker, web-ui, Redis, Postgres)
 type: application
-version: 0.6.0
-appVersion: "0.6.0"
+version: 0.7.0
+appVersion: "0.7.0"
 home: https://github.com/maxuver/sentinelops
 sources:
   - https://github.com/maxuver/sentinelops

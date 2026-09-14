@@ -120,6 +120,57 @@ class K8sEventsCollector:
             await self._api_client.close()
 
 
+class K8sPodLogsCollector:
+    """The alerting pod's own output through the Kubernetes API, no Loki needed.
+
+    For a crash-looping pod the reason is in the *previous* container's
+    output, so both the current and the previous container are read. On a
+    cluster with only events, the 7B model guessed "image pull issue" for a
+    pod whose last line was "could not connect to postgres:5432". Read-only:
+    needs get on pods/log, which the chart grants.
+    """
+
+    name = "k8s-logs"
+
+    def __init__(self, api=None, tail_lines: int = 50) -> None:
+        self._api = api
+        self._tail = tail_lines
+        self._api_client = None
+
+    async def _get_api(self):
+        if self._api is None:  # pragma: no cover - real cluster path
+            from kubernetes_asyncio import client, config
+
+            try:
+                config.load_incluster_config()
+            except config.ConfigException:
+                await config.load_kube_config()
+            self._api_client = client.ApiClient()
+            self._api = client.CoreV1Api(self._api_client)
+        return self._api
+
+    async def collect(self, alert: StreamAlert) -> ContextBundle:
+        pod = alert.labels.get("pod")
+        if not pod:
+            return ContextBundle(sources_ok=[self.name])  # nothing to read for a non-pod alert
+        ns = alert.namespace or "default"
+        api = await self._get_api()
+        lines: list[str] = []
+        for previous in (True, False):
+            try:
+                text = await api.read_namespaced_pod_log(pod, ns, tail_lines=self._tail, previous=previous)
+            except Exception as exc:
+                if not previous:
+                    raise
+                logger.debug("no previous container log for %s/%s: %s", ns, pod, exc)
+                continue
+            if text and text.strip():
+                label = "previous container" if previous else "current container"
+                lines.append(f"--- {label} ({pod})")
+                lines.extend(text.strip().splitlines()[-self._tail :])
+        return ContextBundle(log_lines=lines, sources_ok=[self.name])
+
+
 class PrometheusCollector:
     """Query Prometheus for the metrics around the alert — restarts, memory and
     CPU pressure for the alerting pod. Instant queries at the alert timestamp.
@@ -251,6 +302,7 @@ class AggregateCollector:
 _REGISTRY = {
     "stub": lambda cfg: StubCollector(),
     "k8s-events": lambda cfg: K8sEventsCollector(max_events=cfg.k8s_max_events),
+    "k8s-logs": lambda cfg: K8sPodLogsCollector(tail_lines=cfg.loki_max_lines),
     "prometheus": lambda cfg: PrometheusCollector(cfg.prometheus_url),
     "loki": lambda cfg: LokiCollector(
         cfg.loki_url, max_lines=cfg.loki_max_lines, window_minutes=cfg.loki_window_minutes

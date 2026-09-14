@@ -56,7 +56,10 @@ config:
   # a free tier is 0 / 0).
   openaiPriceInPerMtok: 0.28
   openaiPriceOutPerMtok: 0.42
-  collectors: k8s-events
+  # k8s-logs reads the alerting pod's current and previous container output
+  # through the API, so a cluster without Loki still gives the model the line
+  # that says why the process died. Add prometheus,loki when you have them.
+  collectors: k8s-events,k8s-logs
   notifier: stub
   # memory | postgres. postgres stores the incident history (redacted only).
   store: memory
