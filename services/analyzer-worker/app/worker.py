@@ -28,6 +28,18 @@ class Worker:
         self._redis = redis_client
         self._analyzer = analyzer
         self._cfg = cfg
+        self._stopping = False
+
+    def stop(self) -> None:
+        """Finish the message in hand, then leave the loop.
+
+        In a container this process is PID 1, and PID 1 ignores SIGTERM unless
+        a handler is installed. Without one, the *old* pod of a rollout kept
+        reading the stream for the whole 30 s grace period under the same
+        consumer name as the new pod, and on 2026-09-14 analysed an alert with
+        the code the rollout was replacing.
+        """
+        self._stopping = True
 
     async def ensure_group(self) -> None:
         """Create the consumer group idempotently (tolerate BUSYGROUP)."""
@@ -38,6 +50,25 @@ class Worker:
         except ResponseError as exc:
             if "BUSYGROUP" not in str(exc):
                 raise
+
+    async def prune_consumers(self) -> int:
+        """Forget consumers that are gone: no pending entries and idle for longer
+        than the reclaim threshold. With one consumer name per pod, every
+        rollout leaves a dead name behind otherwise."""
+        try:
+            consumers = await self._redis.xinfo_consumers(self._cfg.alerts_stream, self._cfg.consumer_group)
+        except ResponseError:  # pragma: no cover - group not there yet
+            return 0
+        pruned = 0
+        for c in consumers:
+            name = c.get("name")
+            if name == self._cfg.consumer_name or int(c.get("pending", 0)) or int(c.get("idle", 0)) < self._cfg.reclaim_idle_ms:
+                continue
+            await self._redis.xgroup_delconsumer(self._cfg.alerts_stream, self._cfg.consumer_group, name)
+            pruned += 1
+        if pruned:
+            logger.info("pruned %d dead consumer(s) from group %s", pruned, self._cfg.consumer_group)
+        return pruned
 
     async def reclaim(self) -> int:
         """Take over messages delivered to a consumer that never acknowledged them.
@@ -135,6 +166,9 @@ class Worker:
         )
 
     async def run(self) -> None:  # pragma: no cover - exercised by run_once in tests
+        # First, before any await: a SIGTERM that lands during startup (a
+        # rollout racing a rollout) must not be ignored by PID 1.
+        self._install_signal_handlers()
         await self.ensure_group()
         store = getattr(self._analyzer, "_store", None)
         if hasattr(store, "ensure_schema"):
@@ -145,8 +179,20 @@ class Worker:
             self._cfg.consumer_name,
             self._cfg.alerts_stream,
         )
-        while True:
+        await self.prune_consumers()
+        while not self._stopping:
             await self.run_once()
+        logger.info("analyzer-worker stopped cleanly (consumer=%s)", self._cfg.consumer_name)
+
+    def _install_signal_handlers(self) -> None:  # pragma: no cover - process plumbing
+        import signal
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(sig, self.stop)
+            except (NotImplementedError, RuntimeError):  # Windows dev shells
+                signal.signal(sig, lambda *_: self.stop())
 
 
 def build_worker(cfg: Settings = settings) -> Worker:  # pragma: no cover - wiring

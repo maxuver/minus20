@@ -56,6 +56,8 @@ spec:
               value: {{ .Values.agent.visionModel | quote }}
             - name: SENTINELOPS_OPENAI_VISION_MODEL
               value: {{ .Values.agent.openaiVisionModel | quote }}
+            - name: SENTINELOPS_VISION_PROVIDER
+              value: {{ .Values.agent.visionProvider | quote }}
             {{- if .Values.agent.runbooks }}
             - name: SENTINELOPS_RUNBOOKS_DIR
               value: /runbooks
@@ -67,7 +69,7 @@ spec:
                   name: {{ .Release.Name }}-postgres-dsn
                   key: dsn
             {{- end }}
-            {{- if eq .Values.config.llmProvider "openai" }}
+            {{- if or (eq .Values.config.llmProvider "openai") (eq .Values.config.llmFallbackProvider "openai") }}
             - name: SENTINELOPS_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:

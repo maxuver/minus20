@@ -198,7 +198,7 @@ async def test_openai_compatible_backend_degrades_on_empty_choices():
 
 async def test_openai_compatible_backend_degrades_on_http_error():
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(429, json={"error": "rate limited"})
+        return httpx.Response(500, json={"error": "upstream exploded"})  # not a retry status
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://p")
     with pytest.raises(BackendError):
@@ -309,3 +309,28 @@ async def test_openai_backend_does_not_retry_other_errors():
         await OpenAICompatibleBackend(Settings(), client=client).analyze("prompt")
     assert attempts["n"] == 1
     await client.aclose()
+
+
+# ---- tiered backends --------------------------------------------------------
+
+async def test_fallback_backend_answers_with_the_secondary_and_says_so():
+    from app.backends import FallbackBackend
+
+    class Dead:
+        name = "openai"
+
+        async def analyze(self, prompt):
+            raise BackendError("HTTP 429 from provider: quota")
+
+    result = await FallbackBackend(Dead(), StubBackend()).analyze("prompt")
+    assert result.backend == "stub"  # honest about who answered
+    assert result.hypothesis.root_cause
+
+
+def test_get_backend_builds_a_tier_when_a_fallback_is_configured():
+    from app.backends import FallbackBackend
+
+    b = get_backend(Settings(llm_provider="openai", llm_fallback_provider="ollama"))
+    assert isinstance(b, FallbackBackend) and b.name == "openai>ollama"
+    same = get_backend(Settings(llm_provider="ollama", llm_fallback_provider="ollama"))
+    assert isinstance(same, OllamaBackend)  # a fallback equal to the primary is ignored

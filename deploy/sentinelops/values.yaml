@@ -34,6 +34,10 @@ config:
   # stub | ollama | openai | anthropic. Selecting a backend is configuration,
   # never code (ADR-0002). API keys live in the so-llm Secret, never here.
   llmProvider: stub
+  # Tiered: if the primary fails (quota, outage, timeout) this one answers
+  # instead. "openai" + "ollama" = cloud quality when available, local and
+  # free when not. Empty = no fallback.
+  llmFallbackProvider: ""
   # ollama: a local model, zero egress, $0 per alert. The URL must be reachable
   # from inside the cluster: an in-cluster Ollama Service, or on kind/Docker
   # Desktop the host via http://host.docker.internal:11434.
@@ -90,6 +94,9 @@ agent:
   # the chat model, or name a vision-capable one (e.g. gemini-2.5-flash).
   visionModel: qwen2.5vl:7b
   openaiVisionModel: ""
+  # ollama | openai: which adapter reads screenshots. Local by default, so a
+  # cloud quota running out never stops the bot from reading a picture.
+  visionProvider: ollama
   # Runbooks to index into memory: filename -> markdown. Example:
   #   runbooks:
   #     dns-networkpolicy.md: |

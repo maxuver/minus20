@@ -51,6 +51,8 @@ _MIGRATIONS = (
     # Audit trail: the redacted context the model was shown (ADR-0002 keeps
     # it redacted; a regulated team needs to see what the model saw).
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS context TEXT",
+    # Alert fired → hypothesis ready, end to end; the business number.
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS time_to_hypothesis_ms INTEGER",
 )
 
 _INDEXES = (
@@ -62,8 +64,9 @@ _INSERT = """
 INSERT INTO incidents (
     id, fingerprint, alertname, namespace, severity, status,
     root_cause, confidence, blast_radius, evidence, disproof, next_steps,
-    backend, cost_usd, latency_ms, failure_reason, created_at, context
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+    backend, cost_usd, latency_ms, failure_reason, created_at, context,
+    time_to_hypothesis_ms
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 ON CONFLICT (id) DO NOTHING
 """
 
@@ -138,6 +141,7 @@ class PostgresStore:
                 incident.failure_reason,
                 incident.created_at,
                 incident.context or None,
+                incident.time_to_hypothesis_ms or None,
             )
 
 

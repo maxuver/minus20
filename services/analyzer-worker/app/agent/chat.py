@@ -316,11 +316,57 @@ class OpenAIChat:
         return (choices[0].get("message") or {}).get("content") or ""
 
 
+class FallbackChat:
+    """Chat through the primary; on a BackendError use the secondary.
+
+    Vision is routed by `vision_provider` on its own, so a cloud quota running
+    out never stops a local model from reading a screenshot.
+    """
+
+    def __init__(self, primary: ChatBackend, secondary: ChatBackend, vision: ChatBackend) -> None:
+        self._primary = primary
+        self._secondary = secondary
+        self._vision = vision
+        self.name = f"{primary.name}>{secondary.name}"
+
+    async def chat(self, messages: list[dict], tools: list[dict] | None) -> ChatTurn:
+        try:
+            return await self._primary.chat(messages, tools)
+        except BackendError:
+            return await self._secondary.chat(messages, tools)
+
+    async def describe_image(self, image_b64: str, prompt: str) -> str:
+        return await self._vision.describe_image(image_b64, prompt)
+
+
+class _VisionRouted:
+    """A single chat backend whose vision goes to a different adapter."""
+
+    def __init__(self, chat: ChatBackend, vision: ChatBackend) -> None:
+        self._chat = chat
+        self._vision = vision
+        self.name = chat.name
+
+    async def chat(self, messages: list[dict], tools: list[dict] | None) -> ChatTurn:
+        return await self._chat.chat(messages, tools)
+
+    async def describe_image(self, image_b64: str, prompt: str) -> str:
+        return await self._vision.describe_image(image_b64, prompt)
+
+
+def _single_chat(provider: str, cfg: Settings) -> ChatBackend:
+    return OpenAIChat(cfg) if provider == "openai" else OllamaChat(cfg)
+
+
 def get_chat_backend(cfg: Settings = settings) -> ChatBackend:
-    """The agent shares the worker's provider setting; stub/anthropic fall back
-    to Ollama for chat because the agent needs tool calling, which the stub
+    """The agent shares the worker's provider settings. stub/anthropic map to
+    Ollama for chat because the agent needs tool calling, which the stub
     cannot do and the Anthropic path here does not implement yet."""
-    provider = cfg.llm_provider.lower()
-    if provider == "openai":
-        return OpenAIChat(cfg)
-    return OllamaChat(cfg)
+    primary = _single_chat(cfg.llm_provider.lower(), cfg)
+    vision = _single_chat(cfg.vision_provider.lower(), cfg)
+    fallback = cfg.llm_fallback_provider.lower().strip()
+    if fallback and fallback != cfg.llm_provider.lower():
+        return FallbackChat(primary, _single_chat(fallback, cfg), vision)
+    if vision.name != primary.name:
+        return _VisionRouted(primary, vision)
+    return primary

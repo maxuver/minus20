@@ -18,12 +18,15 @@ Analyzer degrades gracefully rather than delivering garbage.
 from __future__ import annotations
 
 import json
+import logging
 import re
 
 from .config import Settings, settings
 from .errors import describe, post_with_retry
 from .models import Hypothesis, LLMResult
 from .ports import BackendError
+
+logger = logging.getLogger("analyzer-worker.backends")
 
 _FENCE = re.compile(r"^```(?:json)?|```$", re.MULTILINE)
 
@@ -264,9 +267,31 @@ class OpenAICompatibleBackend:
         )
 
 
-def get_backend(cfg: Settings = settings):
-    """Return the configured backend (ADR-0002: config, not code)."""
-    provider = cfg.llm_provider.lower()
+class FallbackBackend:
+    """Try the primary; if it raises, analyse with the secondary.
+
+    The result names the backend that actually answered, so the incident
+    record, the message footer and the cost are honest about which model was
+    used. Both attempts share the caller's timeout, so the reflex path stays
+    bounded; a slow primary that times out leaves nothing for the fallback,
+    which is the right trade: the alert still goes out, just without a
+    hypothesis, exactly as before.
+    """
+
+    def __init__(self, primary, secondary) -> None:
+        self._primary = primary
+        self._secondary = secondary
+        self.name = f"{primary.name}>{secondary.name}"
+
+    async def analyze(self, prompt: str) -> LLMResult:
+        try:
+            return await self._primary.analyze(prompt)
+        except BackendError as exc:
+            logger.warning("primary backend %s failed (%s); trying %s", self._primary.name, exc, self._secondary.name)
+            return await self._secondary.analyze(prompt)
+
+
+def _single_backend(provider: str, cfg: Settings):
     if provider == "anthropic":
         return AnthropicBackend(cfg)
     if provider == "ollama":
@@ -275,4 +300,13 @@ def get_backend(cfg: Settings = settings):
         return OpenAICompatibleBackend(cfg)
     if provider == "stub":
         return StubBackend()
-    raise ValueError(f"unknown SENTINELOPS_LLM_PROVIDER: {cfg.llm_provider!r}")
+    raise ValueError(f"unknown SENTINELOPS_LLM_PROVIDER: {provider!r}")
+
+
+def get_backend(cfg: Settings = settings):
+    """Return the configured backend (ADR-0002: config, not code)."""
+    primary = _single_backend(cfg.llm_provider.lower(), cfg)
+    fallback = cfg.llm_fallback_provider.lower().strip()
+    if fallback and fallback != cfg.llm_provider.lower():
+        return FallbackBackend(primary, _single_backend(fallback, cfg))
+    return primary

@@ -800,3 +800,30 @@ async def test_openai_describe_image_uses_data_url_and_vision_model():
     parts = seen["body"]["messages"][0]["content"]
     assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,QUJD")
     await client.aclose()
+
+
+async def test_chat_fallback_and_vision_routing():
+    from app.agent.chat import FallbackChat, get_chat_backend
+
+    class Dead:
+        name = "openai"
+
+        async def chat(self, messages, tools_):
+            from app.ports import BackendError
+
+            raise BackendError("HTTP 429 from provider: quota")
+
+        async def describe_image(self, b64, prompt):
+            raise AssertionError("vision must not go to the dead cloud adapter")
+
+    local = FakeChat([ChatTurn(content="local answer")])
+    fb = FallbackChat(Dead(), local, vision=local)
+    turn = await fb.chat([{"role": "user", "content": "q"}], None)
+    assert turn.content == "local answer"
+    assert "postgres:5432" in await fb.describe_image("QUJD", "transcribe")  # FakeChat's transcript
+
+    cfg = Settings(llm_provider="openai", llm_fallback_provider="ollama", vision_provider="ollama")
+    assert get_chat_backend(cfg).name == "openai>ollama"
+    cfg = Settings(llm_provider="openai", vision_provider="ollama")
+    routed = get_chat_backend(cfg)
+    assert routed.name == "openai" and routed._vision.name == "ollama"

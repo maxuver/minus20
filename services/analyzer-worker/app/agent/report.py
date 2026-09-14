@@ -37,7 +37,10 @@ SELECT count(*)                                              AS total,
        count(*) FILTER (WHERE verdict = 'correct')           AS confirmed,
        count(*) FILTER (WHERE verdict = 'wrong')             AS refuted,
        coalesce(sum(cost_usd), 0)                            AS cost_usd,
-       coalesce(avg(latency_ms) FILTER (WHERE status = 'analyzed'), 0) AS avg_latency_ms
+       coalesce(avg(latency_ms) FILTER (WHERE status = 'analyzed'), 0) AS avg_latency_ms,
+       coalesce(avg(time_to_hypothesis_ms) FILTER (WHERE status = 'analyzed'), 0) AS avg_ttfh_ms,
+       coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY time_to_hypothesis_ms)
+                FILTER (WHERE status = 'analyzed' AND time_to_hypothesis_ms IS NOT NULL), 0) AS p95_ttfh_ms
 FROM incidents WHERE created_at >= $1 AND created_at < $2
 """
 
@@ -175,8 +178,14 @@ def render(data: ReportData) -> str:
         lines.append("Engineer verdicts: none yet (reply /ok <id> or /wrong <id> <cause> to teach it)")
     lines.append(
         f"AI cost: ${float(t.get('cost_usd') or 0):.4f}   "
-        f"avg time to hypothesis: {int(t.get('avg_latency_ms') or 0) / 1000:.1f}s"
+        f"model call avg: {int(t.get('avg_latency_ms') or 0) / 1000:.1f}s"
     )
+    ttfh_avg, ttfh_p95 = int(t.get("avg_ttfh_ms") or 0), int(t.get("p95_ttfh_ms") or 0)
+    if ttfh_avg:
+        lines.append(
+            f"Alert fired → hypothesis in chat: avg {ttfh_avg / 1000:.0f}s, p95 {ttfh_p95 / 1000:.0f}s "
+            "(manual triage: typically 10–30 min)"
+        )
 
     lines += ["", "TOP CAUSES"]
     lines += [f"  {n:>3}  {_pct(n, total):>4}  {cause}" for cause, n in data.by_cause]

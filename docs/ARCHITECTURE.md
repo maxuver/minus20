@@ -48,12 +48,12 @@ vendor is never a code change (ADR-0002).
 | Port | Adapters | Selected by |
 |---|---|---|
 | `Collector` | `K8sEventsCollector`, `PrometheusCollector`, `LokiCollector`, `StubCollector`, fanned out by `AggregateCollector` | `SENTINELOPS_COLLECTORS` |
-| `LLMBackend` | `OllamaBackend` (local, $0), `OpenAICompatibleBackend` (DeepSeek, Groq, Gemini, vLLM…), `AnthropicBackend`, `StubBackend` | `SENTINELOPS_LLM_PROVIDER` |
+| `LLMBackend` | `OllamaBackend` (local, $0), `OpenAICompatibleBackend` (DeepSeek, Groq, Gemini, vLLM…), `AnthropicBackend`, `StubBackend`; `FallbackBackend` tiers any two | `SENTINELOPS_LLM_PROVIDER`, `_LLM_FALLBACK_PROVIDER` |
 | `Notifier` | `SlackNotifier` (Incoming Webhook), `TelegramNotifier`, `StubNotifier` | `SENTINELOPS_NOTIFIER` |
 | `IncidentStore` | `PostgresStore`, `InMemoryStore` | `SENTINELOPS_STORE` |
 | `Budget` | `RedisBudget` (shared across replicas), `InMemoryBudget` | Redis present or not |
 | `Deduplicator` | `RedisDeduplicator` (`SET NX EX`), `InMemoryDeduplicator` | Redis present or not |
-| `ChatBackend` (agent) | `OllamaChat`, `OpenAIChat` | `SENTINELOPS_LLM_PROVIDER` |
+| `ChatBackend` (agent) | `OllamaChat`, `OpenAIChat`, `FallbackChat`; vision routed separately | `SENTINELOPS_LLM_PROVIDER`, `_VISION_PROVIDER` |
 | `Embedder` (agent) | `OllamaEmbedder` | `SENTINELOPS_EMBED_MODEL` |
 
 Tests inject fakes at the same ports (`httpx.MockTransport`, fake pools, fake
@@ -79,8 +79,13 @@ second.
    at any step still delivers the alert.
 6. A message read by a worker that dies mid-analysis is reclaimed by the next
    worker (`XAUTOCLAIM` after an idle threshold) and analysed, bypassing the
-   dedup key the dead worker already set. Every log line passes through the
+   dedup key the dead worker already set. Each pod is its own consumer, a
+   worker stops reading on SIGTERM and finishes the message in hand, and dead
+   consumer names are pruned at startup. Every log line passes through the
    redactor before it is written, exception text included.
+7. Two clocks are recorded per incident: the model call (`latency_ms`) and
+   the wall clock from the alert firing to the hypothesis
+   (`time_to_hypothesis_ms`), which is what an engineering manager asks for.
 
 With the Ollama backend and local embeddings, no byte of log, metric or
 event leaves the cluster. That is the difference between "we redact" and

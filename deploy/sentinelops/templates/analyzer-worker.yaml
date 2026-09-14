@@ -21,6 +21,10 @@ spec:
     spec:
       # Reads Kubernetes events with the least-privilege, read-only SA (rbac.yaml).
       serviceAccountName: {{ .Release.Name }}-analyzer
+      # Long enough to finish one analysis (LLM timeout + delivery) after SIGTERM;
+      # the worker stops reading immediately and exits when the message in hand
+      # is done.
+      terminationGracePeriodSeconds: 150
       containers:
         - name: analyzer-worker
           image: {{ .Values.images.analyzer }}
@@ -28,8 +32,14 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-config
-          {{- if or (eq .Values.config.llmProvider "anthropic") (eq .Values.config.llmProvider "openai") (eq .Values.config.notifier "telegram") (eq .Values.config.notifier "slack") (eq .Values.config.store "postgres") }}
           env:
+            # One consumer name per pod, so a message left pending by a pod that
+            # died is visibly someone else's and gets reclaimed (XAUTOCLAIM),
+            # instead of two pods sharing one name during a rollout.
+            - name: SENTINELOPS_CONSUMER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             {{- if eq .Values.config.store "postgres" }}
             # The DSN carries a password, so it lives in a Secret, not the ConfigMap.
             - name: SENTINELOPS_POSTGRES_DSN
@@ -45,7 +55,7 @@ spec:
                   name: {{ .Release.Name }}-llm
                   key: anthropic-api-key
             {{- end }}
-            {{- if eq .Values.config.llmProvider "openai" }}
+            {{- if or (eq .Values.config.llmProvider "openai") (eq .Values.config.llmFallbackProvider "openai") }}
             - name: SENTINELOPS_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -69,6 +79,5 @@ spec:
                   name: {{ .Release.Name }}-telegram
                   key: bot-token
             {{- end }}
-          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

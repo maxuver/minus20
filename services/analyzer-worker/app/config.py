@@ -36,6 +36,11 @@ class Settings(BaseSettings):
 
     # --- LLM backend (ADR-0002: selecting a backend is configuration, not code) ---
     llm_provider: str = "stub"  # "anthropic" | "ollama" | "openai" | "stub"
+    # Tiered backends: when the primary fails (quota, outage, timeout) the
+    # incident is analysed by this one instead of going out without a
+    # hypothesis. "openai" primary + "ollama" fallback = cloud quality when
+    # available, local and free when not. Empty = no fallback.
+    llm_fallback_provider: str = ""
     # Fast path defaults to Haiku: analysing *every* alert then costs cents
     # (VISION §3, ADR-0001). Override per deployment.
     anthropic_model: str = "claude-haiku-4-5"
@@ -97,6 +102,10 @@ class Settings(BaseSettings):
     # provider the chat model is used unless a vision one is named.
     vision_model: str = "qwen2.5vl:7b"
     openai_vision_model: str = ""
+    # Which adapter transcribes screenshots: "ollama" (local, default) or
+    # "openai". Independent of the chat provider, so a cloud quota running out
+    # never stops a local vision model from reading a picture.
+    vision_provider: str = "ollama"
 
     # --- MCP server (the same read-only tools, for any agent CLI) ---
     mcp_transport: str = "stdio"  # "stdio" (local CLI) | "http" (in-cluster Service)

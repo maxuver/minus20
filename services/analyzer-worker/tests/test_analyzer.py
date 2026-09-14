@@ -178,3 +178,22 @@ async def test_incident_records_the_redacted_context_the_model_saw():
     assert "auth failed" in inc.context
     assert "admin@corp.example" not in inc.context and "10.1.2.3" not in inc.context
     assert store.saved[0].context == inc.context
+
+
+async def test_incident_records_time_from_alert_firing_to_hypothesis():
+    from datetime import datetime, timedelta, timezone
+
+    from app.analyzer import Analyzer
+    from app.backends import StubBackend
+    from app.budget import InMemoryBudget
+    from app.collectors import StubCollector
+    from app.models import StreamAlert
+    from app.notifiers import StubNotifier
+    from app.stores import InMemoryStore
+
+    fired = datetime.now(timezone.utc) - timedelta(seconds=90)
+    analyzer = Analyzer(collector=StubCollector(), backend=StubBackend(), notifier=StubNotifier(), store=InMemoryStore(), budget=InMemoryBudget(1.0))
+    inc = await analyzer.analyze(StreamAlert(labels={"alertname": "X"}, startsAt=fired))
+    assert 89_000 <= inc.time_to_hypothesis_ms <= 95_000  # ~90 s from firing, not the 1 ms model call
+    no_time = await analyzer.analyze(StreamAlert(labels={"alertname": "Y"}))
+    assert no_time.time_to_hypothesis_ms == 0

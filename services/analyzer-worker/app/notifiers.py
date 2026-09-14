@@ -27,6 +27,13 @@ def _icon(severity: str) -> str:
     return _SEVERITY_ICON.get(severity.lower(), "⚪")
 
 
+def _ttfh(incident: Incident) -> str:
+    """' · 41 s from alert' when the alert carried a firing time."""
+    if not incident.time_to_hypothesis_ms:
+        return ""
+    return f" · {incident.time_to_hypothesis_ms / 1000:.0f} s from alert"
+
+
 def _where(incident: Incident) -> str:
     return " · ".join(
         p for p in (incident.namespace, incident.severity) if p and p != "unknown"
@@ -71,8 +78,8 @@ def format_message(incident: Incident) -> str:
 
         lines.append("")
         lines.append(
-            f"<i>⏱ {escape(incident.backend)} · {incident.latency_ms} ms · "
-            f"${incident.cost_usd:.4f} · #{incident.id[:8]}</i>"
+            f"<i>⏱ {escape(incident.backend)} · {incident.latency_ms} ms"
+            f"{_ttfh(incident)} · ${incident.cost_usd:.4f} · #{incident.id[:8]}</i>"
         )
 
     elif incident.status is IncidentStatus.BUDGET_EXCEEDED:
@@ -134,7 +141,7 @@ def format_slack_blocks(incident: Incident) -> list[dict]:
         # The short id is what the engineer quotes back to the agent
         # (/ok <id>, /wrong <id> <cause>) to record the real outcome (ADR-0005).
         footer = (
-            f"{esc(incident.backend)} · {incident.latency_ms} ms · "
+            f"{esc(incident.backend)} · {incident.latency_ms} ms{_ttfh(incident)} · "
             f"${incident.cost_usd:.4f} · #{incident.id[:8]}"
         )
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": footer}]})

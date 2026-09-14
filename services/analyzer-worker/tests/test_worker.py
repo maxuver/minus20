@@ -141,3 +141,37 @@ async def test_reclaim_respects_the_idle_threshold(rds, raw_payload):
     assert await Worker(rds, analyzer, cfg).reclaim() == 0
     assert analyzer.calls == 0
     assert await _pending_count(rds, cfg) == 1  # still theirs
+
+
+async def test_stop_finishes_the_message_in_hand_then_reads_no_more(rds, raw_payload):
+    cfg = Settings(block_ms=50)
+    analyzer = StubAnalyzer()
+    worker = Worker(rds, analyzer, cfg)
+    await worker.ensure_group()
+    await rds.xadd(cfg.alerts_stream, {"payload": json.dumps(raw_payload)})
+    await rds.xadd(cfg.alerts_stream, {"payload": json.dumps(raw_payload)})
+
+    worker.stop()  # SIGTERM arrived
+    handled = await worker.run_once()  # the iteration already in flight completes
+    assert handled == 2 and analyzer.calls == 2
+    assert await _pending_count(rds, cfg) == 0
+    assert worker._stopping  # run() would not iterate again
+
+
+async def test_dead_consumers_are_pruned_but_live_and_pending_ones_kept(rds, raw_payload):
+    cfg = Settings(block_ms=50, reclaim_idle_ms=0, consumer_name="me")
+    me = Worker(rds, StubAnalyzer(), cfg)
+    await me.ensure_group()
+    # a dead consumer with nothing pending, and one that still holds a message
+    await rds.xadd(cfg.alerts_stream, {"payload": json.dumps(raw_payload)})
+    await rds.xreadgroup(cfg.consumer_group, "ghost", {cfg.alerts_stream: ">"}, count=1)
+    entries = await rds.xpending_range(cfg.alerts_stream, cfg.consumer_group, "-", "+", 10)
+    await rds.xack(cfg.alerts_stream, cfg.consumer_group, entries[0]["message_id"])  # ghost finished, then died
+    await rds.xadd(cfg.alerts_stream, {"payload": json.dumps(raw_payload)})
+    await rds.xreadgroup(cfg.consumer_group, "busy", {cfg.alerts_stream: ">"}, count=1)  # busy holds one
+
+    pruned = await me.prune_consumers()
+
+    names = {c["name"] for c in await rds.xinfo_consumers(cfg.alerts_stream, cfg.consumer_group)}
+    assert pruned == 1
+    assert "ghost" not in names and "busy" in names

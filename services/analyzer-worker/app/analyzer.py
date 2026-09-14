@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 
 from .models import Incident, IncidentStatus, StreamAlert
 from .ports import Budget, Collector, Deduplicator, IncidentStore, LLMBackend, Notifier
@@ -93,10 +94,14 @@ class Analyzer:
         await self._budget.add(result.cost_usd)
         incident.status = IncidentStatus.ANALYZED
         incident.hypothesis = result.hypothesis
+        incident.backend = getattr(result, "backend", incident.backend) or incident.backend
         incident.cost_usd = result.cost_usd
         incident.input_tokens = result.input_tokens
         incident.output_tokens = result.output_tokens
         incident.latency_ms = int((time.perf_counter() - started) * 1000)
+        if alert.startsAt is not None:
+            fired = alert.startsAt if alert.startsAt.tzinfo else alert.startsAt.replace(tzinfo=timezone.utc)
+            incident.time_to_hypothesis_ms = max(0, int((datetime.now(timezone.utc) - fired).total_seconds() * 1000))
         return await self._finish(incident)
 
     async def _finish(self, incident: Incident) -> Incident:

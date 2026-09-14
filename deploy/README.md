@@ -173,6 +173,19 @@ Measured 2026-09-13: hard benchmark 5/5 in 7.6 s average (`docs/BENCHMARKS.md`).
 Google's free tier may use your data to improve its products; use a paid key
 or a local model for real logs.
 
+**Tiered: cloud when it answers, local when it does not.** `llmFallbackProvider`
+names a second backend used only when the first raises (quota, outage,
+timeout). The incident records which one answered. Screenshots are read by
+`agent.visionProvider` (local by default) regardless of the chat provider.
+
+```bash
+helm upgrade --install so deploy/sentinelops -n sentinelops   --set config.llmProvider=openai --set config.llmFallbackProvider=ollama   --set config.ollamaUrl=http://host.docker.internal:11434
+```
+
+Measured 2026-09-14, Gemini's free tier out of quota: primary failed with
+HTTP 429, Ollama answered, `backend=ollama`, 131 s from the alert firing to
+the hypothesis.
+
 **Anthropic:**
 
 ```bash

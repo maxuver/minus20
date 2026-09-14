@@ -8,6 +8,7 @@ data:
   SENTINELOPS_REDIS_URL: redis://{{ .Release.Name }}-redis:6379/0
   SENTINELOPS_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
   SENTINELOPS_LLM_PROVIDER: {{ .Values.config.llmProvider | quote }}
+  SENTINELOPS_LLM_FALLBACK_PROVIDER: {{ .Values.config.llmFallbackProvider | quote }}
   SENTINELOPS_OLLAMA_URL: {{ .Values.config.ollamaUrl | quote }}
   SENTINELOPS_OLLAMA_MODEL: {{ .Values.config.ollamaModel | quote }}
   SENTINELOPS_LLM_TIMEOUT_SECONDS: {{ .Values.config.llmTimeoutSeconds | quote }}

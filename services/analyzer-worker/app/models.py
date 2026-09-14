@@ -127,6 +127,10 @@ class Incident(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: int = 0
+    # Wall clock from the alert firing in Alertmanager (startsAt) to the
+    # hypothesis being ready. latency_ms is only the model call; this is the
+    # number an engineering manager asks for. 0 when the alert has no startsAt.
+    time_to_hypothesis_ms: int = 0
     # Exactly what the model was shown, after redaction: the audit trail for
     # "what did it see when it said that". Empty when analysis never ran.
     context: str = ""
