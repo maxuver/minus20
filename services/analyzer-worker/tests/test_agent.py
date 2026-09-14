@@ -858,7 +858,7 @@ async def test_openai_describe_image_uses_data_url_and_vision_model():
     await client.aclose()
 
 
-async def test_chat_fallback_and_vision_routing():
+async def test_chat_fallback_and_vision_routing(caplog):
     from app.agent.chat import FallbackChat, get_chat_backend
 
     class Dead:
@@ -874,8 +874,11 @@ async def test_chat_fallback_and_vision_routing():
 
     local = FakeChat([ChatTurn(content="local answer")])
     fb = FallbackChat(Dead(), local, vision=local)
-    turn = await fb.chat([{"role": "user", "content": "q"}], None)
+    with caplog.at_level("WARNING", logger="analyzer-worker.agent.chat"):
+        turn = await fb.chat([{"role": "user", "content": "q"}], None)
     assert turn.content == "local answer"
+    # the operator can tell from the log which tier answered (a 7B narrative is not a Gemini one)
+    assert any("primary chat openai failed" in r.message and "trying" in r.message for r in caplog.records)
     assert "postgres:5432" in await fb.describe_image("QUJD", "transcribe")  # FakeChat's transcript
 
     cfg = Settings(llm_provider="openai", llm_fallback_provider="ollama", vision_provider="ollama")

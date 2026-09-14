@@ -15,6 +15,7 @@ the cluster, because the registry (tools.py) contains none.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -23,6 +24,8 @@ from typing import Any, Protocol, runtime_checkable
 from ..config import Settings, settings
 from ..errors import describe, post_with_retry
 from ..ports import BackendError
+
+logger = logging.getLogger("analyzer-worker.agent.chat")
 
 
 @dataclass
@@ -332,7 +335,8 @@ class FallbackChat:
     async def chat(self, messages: list[dict], tools: list[dict] | None) -> ChatTurn:
         try:
             return await self._primary.chat(messages, tools)
-        except BackendError:
+        except BackendError as exc:
+            logger.warning("primary chat %s failed (%s); trying %s", self._primary.name, exc, self._secondary.name)
             return await self._secondary.chat(messages, tools)
 
     async def describe_image(self, image_b64: str, prompt: str) -> str:
