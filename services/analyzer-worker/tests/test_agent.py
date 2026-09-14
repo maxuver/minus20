@@ -490,6 +490,24 @@ async def test_search_redacts_the_query_and_returns_hits():
     assert hits and hits[0].kind == "incident"
 
 
+async def test_index_documents_chunks_and_indexes_runbooks(tmp_path):
+    pool = FakePool()
+    mem = Memory(pool, FakeEmbedder(), _cfg())
+    await mem.ensure_schema()
+
+    # Create a sample runbook exceeding 1200 characters to verify chunking
+    runbook = tmp_path / "dns-failure.md"
+    runbook.write_text("# DNS Failures\n\n" + "Investigate NetworkPolicy rules. " * 80 + "\n\nFix: allow port 53 egress.", encoding="utf-8")
+
+    count = await mem.index_documents(tmp_path)
+    assert count >= 2
+    docs = [m for m in pool.memory.values() if m["kind"] == "doc"]
+    assert len(docs) == count
+    assert any(m["ref"] == "dns-failure.md#0" for m in docs)
+    assert any(m["ref"] == "dns-failure.md#1" for m in docs)
+    assert any("Fix: allow port 53" in m["content"] for m in docs)
+
+
 # ---- report (CC-37) -----------------------------------------------------
 
 

@@ -269,6 +269,29 @@ found "cannot connect to postgres:5432" in the previous container's output:
 `openai` provider is for. Runbooks to index go in `agent.runbooks` as
 filename → markdown.
 
+**Indexing runbooks into agent memory.** Operational runbooks (markdown or text)
+can be passed to the Helm release so the agent indexes them into pgvector memory.
+Use Helm's `--set-file` to mount a runbook from your repository:
+
+```bash
+helm upgrade --install so deploy/sentinelops -n sentinelops \
+  --set-file agent.runbooks."networkpolicy-dns-failure\.md"=docs/runbooks/networkpolicy-dns-failure.md
+```
+
+Or declare them directly in a custom `values.yaml`:
+
+```yaml
+agent:
+  runbooks:
+    networkpolicy-dns-failure.md: |
+      # Runbook: DNS Failures After NetworkPolicy Changes
+      ...
+```
+
+Runbooks are mounted to `/runbooks`, chunked, embedded via the local embedding
+model, and searched alongside incident history when answering questions. You can
+also send `/index` in Telegram to trigger a re-index.
+
 ## Use it from your own agent (MCP)
 
 The seven read-only tools are also served over the Model Context Protocol, so
