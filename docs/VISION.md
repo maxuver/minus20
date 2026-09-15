@@ -136,3 +136,36 @@ These numbers are the project's résumé: each one can be demonstrated live.
   on AWS, teams that need the price known in advance, open code.
 - Terraform for EKS was **applied for real** once and destroyed ([EKS-RUN.md](EKS-RUN.md)).
 - Measured accuracy is published, including where it fails ([BENCHMARKS.md](BENCHMARKS.md)).
+
+## 9. Where this goes next (2026-09-15)
+
+The final shape is unchanged: two always-on processes inside the customer's
+cluster (the reflex on the alert path, the deliberate agent on demand), a
+memory of incidents with the engineer's verdicts, a weekly review for the
+people who ask "how many, and why", and the same tools served over MCP. It
+is a Helm release, not a script on someone's laptop, and it must keep working
+when nobody is watching. In that order, the next steps:
+
+1. **Verdicts become the eval set.** `/wrong <id> <cause>` already turns an
+   incident into a replay scenario (`/scenario`). The next step is grading the
+   current model against every verdict in the store, so the benchmark grows
+   from real incidents instead of hand-written fixtures.
+2. **Correlation, not just storms.** Same alert on many pods is already one
+   incident and one model call. Different alerts on one namespace inside one
+   window (a crash loop, a replicas mismatch and an error-rate alert at 03:00)
+   should also be one incident with one hypothesis. That is the alert-fatigue
+   pain in one sentence.
+3. **A cloud tier with a known price and a known jurisdiction.** Gemini's free
+   tier proved too throttled for anything sustained. The OpenAI-compatible
+   adapter makes the provider a config value; the candidates are compared in
+   [BENCHMARKS.md](BENCHMARKS.md) as they are measured.
+4. **AWS-shaped scenarios** (spot interruption storms, Pod Identity denied,
+   EBS volume stuck on a replaced node) for the benchmark, because that is
+   where the comparison with AWS DevOps Agent will be made.
+5. **Unattended operation:** a demo cluster that runs for weeks without a
+   laptop, breaks itself on a schedule, and sends its own weekly review.
+
+Still non-goals: auto-remediation, a shell for the model, and anything that
+"repels" attacks. Traffic anomalies at night are an explanation problem for
+this project (attack, deploy or bug, with evidence); mitigation belongs to the
+edge (WAF, Shield, rate limits), not to a model inside the cluster.
