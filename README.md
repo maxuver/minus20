@@ -26,7 +26,9 @@ Every incident arrives in Slack or Telegram with:
 And when that is not enough, you ask. An agent in the same chat investigates
 with read-only tools, remembers what really caused the last similar incident
 in *your* cluster (you tell it with `/wrong <id> <cause>`), and writes the
-weekly incident review with `/report`.
+weekly incident review with `/report`. Every verdict is also a test: the
+benchmark replays your own incidents against the current model and grades
+it by what you said really happened.
 
 Already use an agent in your terminal? The same tools and memory are an
 [MCP server](deploy/README.md#use-it-from-your-own-agent-mcp): Gemini CLI or
@@ -155,7 +157,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 | Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report`, screenshots via a local vision model | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
 | MCP server — the same read-only tools for Gemini CLI, Claude Code, Cursor | ✅ |
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
-| Fault-injection scenarios + replay benchmark | ✅ [results](docs/BENCHMARKS.md) |
+| Fault-injection scenarios + replay benchmark; the eval set grows from real incidents with an engineer's verdict (`replay --from-store`) | ✅ [results](docs/BENCHMARKS.md) |
 | CI — lint, tests, container build + CVE scan, helm lint, SAST, dependency scan, secret scan of full history, signed provenance + SBOM per image | ✅ |
 | Terraform for AWS EKS | ✅ two real runs (2026-09-13/14): chart from GHCR, Postgres on EBS, MCP, real incidents, destroyed the same session, ~$0.13 each at list price — [proof](docs/EKS-RUN.md) |
 

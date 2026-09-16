@@ -132,7 +132,60 @@ SENTINELOPS_OPENAI_API_KEY=... \
 python -m app.replay scenarios/hard
 ```
 
+Any OpenAI-compatible endpoint works the same way: `https://api.mistral.ai/v1`
+(EU, free Experiment tier), `https://api.deepseek.com` (the adapter's default),
+Groq, vLLM. Only the base URL, the model name and the key change.
+
 Note on the free tier: Google states that free-tier data may be used to improve
 its products. Fine for a benchmark on synthetic scenarios; not a production
 setting for real logs. The 2026-09-13 run was executed inside the cluster so
 the key never left it.
+
+## Growing the set from real incidents
+
+"An author writing their own exam" is the limitation above. The way past it
+is the engineer's verdict: `/ok <id>` and `/wrong <id> <real cause>` in the
+bot record what actually happened, and every such incident already holds the
+redacted context the model saw. So the store is an eval set:
+
+```bash
+SENTINELOPS_POSTGRES_DSN=postgres://... \
+python -m app.replay --from-store --days 90
+```
+
+replays every incident with a verdict through the current model and grades
+the new hypothesis against the verdict (`/ok` makes the recorded hypothesis
+the expectation, `/wrong` makes the engineer's cause the expectation). Add
+`--export scenarios/from-verdicts` to write them out as scenario files, the
+same shape as `scenarios/hard/`, for the ones worth committing. No fixture is
+written by hand, and the set grows one verdict at a time. Incidents without a
+verdict are history, not a test, and are skipped.
+
+### 2026-09-17: first run from the store
+
+Three incidents on the kind cluster carried a verdict (two `/ok`, one
+`/wrong`), replayed against `qwen2.5:7b` on CPU:
+
+| Incident | Context recorded at the time | Verdict | Replay | Grade |
+|---|---|---|---|---|
+| `9e95b7f1` billing-api crash loop, 2026-09-14 18:21 | events only (238 chars, before pod logs were collected by default) | wrong: `postgres:5432 unreachable` | "Image pull failure" | FAIL |
+| `f77f5269` billing-api crash loop, 19:13 | events + logs, the log names `postgres:5432` | ok | "Postgres database is unreachable or misconfigured" | PASS |
+| `85509212` orders-1 storm leader, 21:38 | events + logs, `FATAL secret db-credentials not found` | ok | "Secret 'db-credentials' not found in the pod" | PASS |
+
+2/3, average 36 s per hypothesis. Two things the first run exposed:
+
+- The FAIL is a **collector gap, not a model gap**: with no log line in the
+  context, "image pull" is a reasonable guess for a busybox pod restarting.
+  The same alert with pod logs collected (the next row) was answered right.
+  Pod logs are collected by default since 2026-09-15.
+- The first pass scored 3/3, and one PASS was false. The `/wrong` text was
+  "postgres:5432 unreachable, no secret involved", the grader extracted
+  `secret` from it, and a repeat of the wrong "Secret not found" hypothesis
+  matched. Keywords now come from the first clause only (name the cause
+  first, commentary after a semicolon) and words every hypothesis contains
+  (`error`, `pod`, `container`, `log`) never count. The corrected run is the
+  table above.
+
+One of the three verdicts was also entered wrongly by the author and
+corrected before this table was written: an eval set built from verdicts is
+only as good as the engineer's attention when writing them.

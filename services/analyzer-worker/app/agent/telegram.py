@@ -37,7 +37,7 @@ HELP = (
     "Commands:\n"
     "  /report [days]        incident review for the last N days (default 7)\n"
     "  /ok <id> [note]       the hypothesis for incident #id was right\n"
-    "  /wrong <id> <cause>   it was wrong; record the real cause so I remember\n"
+    "  /wrong <id> <cause>   it was wrong; name the real cause first, commentary after a semicolon\n"
     "  /index                re-index runbooks and incidents into memory\n"
     "  /scenario <id>        export the incident as a replay scenario (a regression test for the triage)\n"
     "  /status               what I can reach right now\n"

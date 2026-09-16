@@ -21,6 +21,15 @@ from typing import Any
 _STOP = {
     "the", "a", "an", "is", "was", "were", "it", "its", "to", "of", "in", "on", "and", "or", "for",
     "by", "with", "that", "this", "not", "no", "be", "as", "at", "from", "because", "due", "which",
+    # function words that carry no cause
+    "after", "before", "could", "would", "should", "can", "will", "then", "when", "while", "into",
+    "over", "under", "right", "just", "also", "very", "more", "than", "but", "only", "same", "each",
+    "all", "any", "some", "has", "have", "had", "does", "did", "are", "been", "being", "there",
+    "their", "them", "they", "you", "your", "our", "still", "again", "never", "without", "actually",
+    # words every hypothesis contains, so they must not count as a match
+    "log", "logs", "line", "lines", "error", "errors", "pod", "pods", "container", "containers",
+    "issue", "problem", "cause", "caused", "fails", "failed", "failure", "failing", "involved",
+    "real", "actual", "kubernetes", "cluster", "namespace", "restart", "restarts", "restarting",
 }
 
 
@@ -39,8 +48,16 @@ def parse_context(rendered: str) -> dict[str, list[str]]:
 
 
 def keywords_from(text: str, limit: int = 6) -> list[str]:
-    """Distinctive words of a resolution, for the keyword grader."""
-    words = re.findall(r"[a-z0-9][a-z0-9_./:-]{2,}", (text or "").lower())
+    """Distinctive words of a resolution, for the keyword grader.
+
+    Only the first clause counts: engineers name the cause first and explain
+    after a comma or semicolon, and the explanation tends to name the wrong
+    hypothesis it corrects ("postgres unreachable; no secret involved, the
+    image pulled fine"). Grading on the whole text scored a PASS for a repeat
+    of the wrong answer because "secret" and "image" appeared in the verdict.
+    """
+    clause = re.split(r"[;.]|,\s", (text or "").lower(), maxsplit=1)[0]
+    words = re.findall(r"[a-z0-9][a-z0-9_./:-]{2,}", clause)
     out: list[str] = []
     for w in words:
         if w in _STOP or w in out:

@@ -740,6 +740,21 @@ def test_incident_exports_as_a_replay_scenario_with_the_verdict_as_expectation()
         assert expected_keywords(path)[:1] == ["db_host"]
 
 
+def test_verdict_keywords_come_from_the_named_cause_not_the_commentary():  # CC-53
+    """A live replay scored PASS for 'Secret not found' because the engineer's verdict
+    said 'postgres:5432 unreachable, no secret involved': the correction named the
+    wrong hypothesis and the grader counted it. Only the first clause is the cause."""
+    from app.agent.scenario import keywords_from
+
+    assert keywords_from("postgres:5432 unreachable, no secret involved; the log line names it") == [
+        "postgres:5432", "unreachable"]
+    assert keywords_from("postgres:5432 unreachable; the image pulled fine") == ["postgres:5432", "unreachable"]
+    assert keywords_from("NetworkPolicy blocked egress to postgres") == ["networkpolicy", "blocked", "egress", "postgres"]
+    # words every hypothesis contains never count as a match
+    assert "container" not in keywords_from("container exits after connect to postgres:5432 failed")
+    assert "error" not in keywords_from("error in the log line: OOMKilled at 512Mi")
+
+
 def test_unreviewed_incident_exports_without_expectations():
     from app.agent.scenario import incident_to_scenario
 

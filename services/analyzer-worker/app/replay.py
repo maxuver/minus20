@@ -9,15 +9,23 @@ backend the harness is offline and free (it proves the harness); point it at a
 real backend and the numbers become real.
 
     python -m app.replay [scenarios_dir]
+    python -m app.replay --from-store [--days N] [--export DIR]
+
+The second form is the eval set growing from real incidents: every incident
+the engineer marked with /ok or /wrong carries the redacted context the model
+saw and the verdict as the expected answer, so the store is replayed and
+graded exactly like the fixture files, with no fixture written by hand.
+`--export` writes those incidents out as scenario files, the same shape as
+scenarios/hard/, so a team can commit the ones worth keeping.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import sys
 from pathlib import Path
 
+from .agent.scenario import incident_to_scenario
 from .analyzer import Analyzer
 from .backends import get_backend
 from .budget import InMemoryBudget
@@ -101,26 +109,89 @@ async def run_all(scenarios_dir: Path = SCENARIOS_DIR, cfg: Settings = settings)
     return [inc for inc, _ in await run_all_graded(scenarios_dir, cfg)]
 
 
-async def run_all_graded(
-    scenarios_dir: Path = SCENARIOS_DIR, cfg: Settings = settings
-) -> list[tuple[Incident, bool | None]]:
-    """Replay every scenario, pairing each incident with its grade.
+Case = tuple[str, StreamAlert, ContextBundle, list[str]]  # name, alert, context, expected keywords
 
-    The grade is None for scenarios that declare no expectation (the easy set,
+
+def scenario_case(data: dict, fallback_name: str = "") -> Case:
+    """One replayable case from scenario JSON (a file or an exported incident)."""
+    alert = StreamAlert(**data["alert"])
+    context = ContextBundle(**data.get("context", {}))
+    keywords = [k.lower() for k in data.get("expected_keywords", [])]
+    return data.get("name", fallback_name), alert, context, keywords
+
+
+def file_cases(scenarios_dir: Path) -> list[Case]:
+    return [
+        scenario_case(json.loads(p.read_text(encoding="utf-8")), p.stem)
+        for p in sorted(scenarios_dir.glob("*.json"))
+    ]
+
+
+VERDICT_SQL = (
+    "SELECT id, fingerprint, alertname, namespace, severity, alert_summary, root_cause, "
+    "verdict, resolution, context, created_at FROM incidents "
+    "WHERE verdict IS NOT NULL AND context IS NOT NULL AND context <> '' "
+    "AND created_at > now() - ($1::int * interval '1 day') ORDER BY created_at"
+)
+
+
+async def store_cases(dsn: str, days: int = 90) -> list[tuple[Case, dict]]:
+    """Every incident with an engineer's verdict, as a case plus its scenario JSON.
+
+    /ok makes the recorded hypothesis the expectation, /wrong <cause> makes the
+    engineer's cause the expectation (see agent/scenario.py). Incidents without
+    a verdict are not an eval set, they are just history, and are skipped.
+    """
+    from .stores import connect_pool
+
+    pool = await connect_pool(dsn)
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(VERDICT_SQL, days)
+    finally:
+        await pool.close()
+    out: list[tuple[Case, dict]] = []
+    for row in rows:
+        data = incident_to_scenario(dict(row))
+        out.append((scenario_case(data), data))
+    return out
+
+
+async def run_cases(cases: list[Case], cfg: Settings = settings) -> list[tuple[Incident, bool | None]]:
+    """Replay each case through the real pipeline, pairing the incident with its grade.
+
+    The grade is None for cases that declare no expectation (the easy set,
     which exists to prove the pipeline runs, not to measure accuracy).
     """
     backend = get_backend(cfg)
     budget = InMemoryBudget(cfg.daily_budget_usd)
     results: list[tuple[Incident, bool | None]] = []
-    for i, path in enumerate(sorted(scenarios_dir.glob("*.json"))):
+    for i, (_name, alert, context, keywords) in enumerate(cases):
         if i and cfg.replay_pause_seconds:
             # Free API tiers meter requests per minute; back-to-back scenarios
             # turned into 429s on Gemini's free tier (2026-09-14).
             await asyncio.sleep(cfg.replay_pause_seconds)
-        _name, alert, context = load_scenario(path)
         incident = await run_scenario(alert, context, backend, budget, cfg)
-        results.append((incident, grade(incident, expected_keywords(path))))
+        results.append((incident, grade(incident, keywords)))
     return results
+
+
+async def run_all_graded(
+    scenarios_dir: Path = SCENARIOS_DIR, cfg: Settings = settings
+) -> list[tuple[Incident, bool | None]]:
+    """Replay every scenario file in a directory (the original entry point)."""
+    return await run_cases(file_cases(scenarios_dir), cfg)
+
+
+def export_cases(exported: list[tuple[Case, dict]], out_dir: Path) -> list[Path]:
+    """Write verdict-backed incidents as scenario files, one per incident."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for (name, _alert, _context, _kw), data in exported:
+        path = out_dir / f"{name}.json"
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        written.append(path)
+    return written
 
 
 def _print_report(graded: list[tuple[Incident, bool | None]]) -> None:
@@ -156,8 +227,31 @@ def _print_report(graded: list[tuple[Incident, bool | None]]) -> None:
         print(f"{'ACCURACY':<26} {correct}/{scored} graded scenarios correct")
 
 
+async def _from_store(days: int, export: Path | None) -> None:  # pragma: no cover - needs Postgres
+    exported = await store_cases(settings.postgres_dsn, days)
+    if not exported:
+        print(f"No incidents with a verdict in the last {days} days; reply /ok or /wrong <id> <cause> in the bot first.")
+        return
+    if export is not None:
+        for path in export_cases(exported, export):
+            print(f"exported {path}")
+    print(f"{len(exported)} incidents with a verdict; replaying against backend={settings.llm_provider}")
+    _print_report(await run_cases([case for case, _ in exported]))
+
+
 def main() -> None:  # pragma: no cover - CLI entrypoint
-    scenarios_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else SCENARIOS_DIR
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("scenarios_dir", nargs="?", default=None, help="directory of scenario files")
+    ap.add_argument("--from-store", action="store_true", help="replay incidents with an engineer's verdict from Postgres")
+    ap.add_argument("--days", type=int, default=90, help="how far back --from-store looks (default 90)")
+    ap.add_argument("--export", type=Path, default=None, help="with --from-store: also write scenario files here")
+    args = ap.parse_args()
+    if args.from_store:
+        asyncio.run(_from_store(args.days, args.export))
+        return
+    scenarios_dir = Path(args.scenarios_dir) if args.scenarios_dir else SCENARIOS_DIR
     _print_report(asyncio.run(run_all_graded(scenarios_dir)))
 
 
