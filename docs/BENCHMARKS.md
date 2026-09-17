@@ -63,6 +63,25 @@ DB_HOST", passes the keyword grader by naming the variable and is still half
 wrong: it calls a symptom the cause. The grader counts it; the reader should
 not.
 
+### 2026-09-17: three AWS-shaped scenarios (hard set = 10)
+
+Where the comparison with AWS DevOps Agent will be made is on EKS, so the
+hard set gained three faults that only exist there, each with a plausible
+wrong answer sitting in plain sight:
+
+| Scenario | The bait | The cause | qwen2.5:7b, CPU | cloud model |
+|---|---|---|---|---|
+| Spot interruption storm | every app log says "lost connection to Redis"; Redis is healthy | the Spot node was reclaimed, Karpenter drained it, 30 pods restarted | ❌ "Redis connection issues", 69 s | pending (free-tier quota) |
+| Pod Identity denied | `AccessDenied` on S3 right after a deploy | the deploy renamed the ServiceAccount; the Pod Identity association points at the old name, the pod runs as the node role | ❌ "S3 PutObject permission denied", 73 s | pending |
+| EBS volume stuck | `Multi-Attach error`, looks like a storage bug | the managed node group replaced the node; the volume is still attached to the terminated instance's stale VolumeAttachment | ✅ "VolumeInUse by terminated instance", 87 s | pending |
+
+Local model on the AWS three: **1/3**, and the two misses are the same
+failure mode as before: the symptom in the application log is named as the
+cause even though the context shows the named component healthy (Redis
+answering, the policy unchanged and a different role in the error). Hard set
+overall on `qwen2.5:7b`: 6/10. The cloud column is filled in when a key with
+a usable quota is available; the scenarios are in `scenarios/hard/`.
+
 ### Hard set, case by case
 
 | Scenario | qwen2.5:7b said | Verdict | gemini-3.6-flash said | Verdict |

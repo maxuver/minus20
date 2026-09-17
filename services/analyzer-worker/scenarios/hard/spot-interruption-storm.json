@@ -1,0 +1,61 @@
+{
+  "name": "spot-interruption-storm",
+  "why_hard": "Thirty pods restart within two minutes and every application log says the same thing: lost connection to Redis. The obvious cause is Redis. Redis is healthy and answering; the pods restarted because the Spot node they all sat on was reclaimed by EC2 with a two-minute notice, Karpenter drained it, and the new node came up 90 seconds later. The evidence is in node events and the interruption-notice log, not in any application log.",
+  "expected_keywords": ["spot", "interrupt", "reclaim", "node", "karpenter", "drain"],
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "KubePodCrashLooping",
+      "namespace": "orders",
+      "pod": "orders-api-6d4f8b7c9-k2p7x",
+      "container": "orders-api",
+      "severity": "critical"
+    },
+    "annotations": {
+      "description": "Pod orders/orders-api-6d4f8b7c9-k2p7x (orders-api) is restarting 4 times / 10 minutes.",
+      "summary": "Pod is crash looping."
+    },
+    "startsAt": "2026-09-16T03:12:00Z",
+    "fingerprint": "s1p2o3t4i5n6t7r8"
+  },
+  "context": {
+    "k8s_events": [
+      "Warning BackOff pod/orders-api-6d4f8b7c9-k2p7x x6: Back-off restarting failed container orders-api in pod orders-api-6d4f8b7c9-k2p7x_orders",
+      "Normal Scheduled pod/orders-api-6d4f8b7c9-k2p7x: Successfully assigned orders/orders-api-6d4f8b7c9-k2p7x to ip-10-0-3-88.eu-central-1.compute.internal",
+      "Normal Killing pod/orders-api-6d4f8b7c9-z9q1w: Stopping container orders-api",
+      "Normal Killing pod/orders-api-6d4f8b7c9-m3n4b: Stopping container orders-api",
+      "Warning InstanceTerminating node/ip-10-0-3-41.eu-central-1.compute.internal: Spot Interruption: EC2 instance i-0a7c…e41 will be terminated at 2026-09-16T03:13:40Z (rebalance recommendation received 03:09:12)",
+      "Normal DisruptionBlocked node/ip-10-0-3-41.eu-central-1.compute.internal: Karpenter: cannot disrupt NodeClaim: pdb orders/orders-api-pdb prevents eviction (allowed 0/30)",
+      "Normal Drained node/ip-10-0-3-41.eu-central-1.compute.internal: Karpenter: node drained, 30 pods evicted (forced: instance terminating)",
+      "Normal NodeReady node/ip-10-0-3-88.eu-central-1.compute.internal: Node ip-10-0-3-88 status is now: NodeReady",
+      "Normal Launched nodeclaim/default-7h2kq: Karpenter: Status condition transitioned, Type: Launched, Status: True, instance-type: m6i.large, capacity-type: spot",
+      "Normal Started pod/orders-api-6d4f8b7c9-k2p7x x4: Started container orders-api"
+    ],
+    "metrics": [
+      "kube_pod_container_status_restarts_total{namespace=\"orders\",pod=\"orders-api-6d4f8b7c9-k2p7x\"} = 4",
+      "sum(kube_pod_container_status_restarts_total{namespace=\"orders\"}) = 118",
+      "count(kube_pod_info{namespace=\"orders\",node=\"ip-10-0-3-41.eu-central-1.compute.internal\"}) = 0",
+      "count(kube_pod_info{namespace=\"orders\",node=\"ip-10-0-3-88.eu-central-1.compute.internal\"}) = 30",
+      "kube_node_status_condition{node=\"ip-10-0-3-88.eu-central-1.compute.internal\",condition=\"Ready\",status=\"true\"} = 1",
+      "karpenter_nodeclaims_terminated_total{reason=\"spot_interruption\"} = 1",
+      "redis_up{instance=\"redis-0.orders:6379\"} = 1",
+      "redis_uptime_in_seconds{instance=\"redis-0.orders:6379\"} = 1839211",
+      "rate(redis_commands_processed_total{instance=\"redis-0.orders:6379\"}[5m]) = 2140",
+      "redis_connected_clients{instance=\"redis-0.orders:6379\"} = 31"
+    ],
+    "log_lines": [
+      "orders-api: ERROR redis: connection lost (read tcp 10.0.3.41:52210->10.0.7.12:6379: read: connection reset by peer)",
+      "orders-api: ERROR redis: connection lost (read tcp 10.0.3.41:52214->10.0.7.12:6379: read: connection reset by peer)",
+      "orders-api: FATAL redis unavailable after 5 retries, exiting",
+      "orders-api: INFO starting orders-api v3.8.1 on ip-10-0-3-88",
+      "orders-api: INFO redis connected 10.0.7.12:6379 (rtt 0.4ms)",
+      "orders-api: ERROR redis: connection lost (read tcp 10.0.3.88:41100->10.0.7.12:6379: i/o timeout)",
+      "orders-api: FATAL redis unavailable after 5 retries, exiting",
+      "aws-node-termination-handler: Spot ITN received for i-0a7c…e41, cordoning and draining ip-10-0-3-41",
+      "karpenter: {\"level\":\"INFO\",\"message\":\"tainted node\",\"node\":\"ip-10-0-3-41.eu-central-1.compute.internal\",\"taint\":\"karpenter.sh/disrupted:NoSchedule\"}",
+      "karpenter: {\"level\":\"INFO\",\"message\":\"deleted node\",\"node\":\"ip-10-0-3-41.eu-central-1.compute.internal\",\"reason\":\"spot interruption\"}",
+      "karpenter: {\"level\":\"INFO\",\"message\":\"launched nodeclaim\",\"nodeclaim\":\"default-7h2kq\",\"instance-type\":\"m6i.large\",\"capacity-type\":\"spot\",\"zone\":\"eu-central-1c\"}",
+      "redis-0: 1:M 16 Sep 03:13:41.902 * Client closed connection (30 clients from 10.0.3.41 disconnected)"
+    ]
+  }
+}

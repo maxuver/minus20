@@ -1,0 +1,51 @@
+{
+  "name": "pod-identity-access-denied",
+  "why_hard": "The service crash-loops with 'AccessDenied' on an S3 bucket right after a deploy, so the obvious cause is a bucket policy or a missing IAM permission. The IAM role has the permission and nothing about the bucket changed. The deploy renamed the ServiceAccount (billing-api-sa -> billing-api); the EKS Pod Identity association still points at the old name, so the pod runs with the node role, not the application role. The evidence is which role actually appears in the error, not the missing permission.",
+  "expected_keywords": ["serviceaccount", "service account", "pod identity", "association", "node role", "assume", "irsa"],
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "KubePodCrashLooping",
+      "namespace": "billing",
+      "pod": "billing-api-7c9d5f4b8-r6t2m",
+      "container": "billing-api",
+      "severity": "critical"
+    },
+    "annotations": {
+      "description": "Pod billing/billing-api-7c9d5f4b8-r6t2m (billing-api) is restarting 5 times / 10 minutes.",
+      "summary": "Pod is crash looping."
+    },
+    "startsAt": "2026-09-16T14:22:00Z",
+    "fingerprint": "p1o2d3i4d5e6n7t8"
+  },
+  "context": {
+    "k8s_events": [
+      "Warning BackOff pod/billing-api-7c9d5f4b8-r6t2m x7: Back-off restarting failed container billing-api in pod billing-api-7c9d5f4b8-r6t2m_billing",
+      "Normal Scheduled pod/billing-api-7c9d5f4b8-r6t2m: Successfully assigned billing/billing-api-7c9d5f4b8-r6t2m to ip-10-0-1-52.eu-central-1.compute.internal",
+      "Normal Pulled pod/billing-api-7c9d5f4b8-r6t2m: Container image \"123456789012.dkr.ecr.eu-central-1.amazonaws.com/billing-api:2.14.0\" already present on machine",
+      "Normal ScalingReplicaSet deployment/billing-api: Scaled up replica set billing-api-7c9d5f4b8 from 0 to 3",
+      "Normal ScalingReplicaSet deployment/billing-api: Scaled down replica set billing-api-5f8e6c7a9 from 3 to 0",
+      "Normal SuccessfulCreate replicaset/billing-api-7c9d5f4b8: Created pod: billing-api-7c9d5f4b8-r6t2m"
+    ],
+    "metrics": [
+      "kube_pod_container_status_restarts_total{namespace=\"billing\",pod=\"billing-api-7c9d5f4b8-r6t2m\"} = 5",
+      "kube_deployment_status_replicas_available{namespace=\"billing\",deployment=\"billing-api\"} = 0",
+      "kube_pod_spec_service_account{namespace=\"billing\",pod=\"billing-api-7c9d5f4b8-r6t2m\",service_account=\"billing-api\"} = 1",
+      "kube_pod_spec_service_account{namespace=\"billing\",pod=\"billing-api-5f8e6c7a9-x1v9c\",service_account=\"billing-api-sa\"} = 1",
+      "kube_replicaset_created{namespace=\"billing\",replicaset=\"billing-api-7c9d5f4b8\"} = 1758032460",
+      "kube_replicaset_created{namespace=\"billing\",replicaset=\"billing-api-5f8e6c7a9\"} = 1755180000",
+      "aws_s3_bucket_policy_last_modified{bucket=\"acme-billing-invoices\"} = 1749000000"
+    ],
+    "log_lines": [
+      "billing-api: INFO starting billing-api 2.14.0",
+      "billing-api: INFO aws credentials: provider=EC2InstanceMetadata (no AWS_CONTAINER_CREDENTIALS_FULL_URI, no AWS_ROLE_ARN in environment)",
+      "billing-api: INFO caller identity: arn:aws:sts::123456789012:assumed-role/eks-prod-node-role/i-0c3f9a12b4d5e6f70",
+      "billing-api: ERROR s3.PutObject invoices/2026-09-16/inv-88213.pdf: AccessDenied: User: arn:aws:sts::123456789012:assumed-role/eks-prod-node-role/i-0c3f9a12b4d5e6f70 is not authorized to perform: s3:PutObject on resource: arn:aws:s3:::acme-billing-invoices/invoices/2026-09-16/inv-88213.pdf because no identity-based policy allows the s3:PutObject action",
+      "billing-api: FATAL cannot write invoices, exiting",
+      "billing-api (previous, 5f8e6c7a9-x1v9c, 2026-09-16 13:50): INFO aws credentials: provider=ContainerCredentials (AWS_CONTAINER_CREDENTIALS_FULL_URI=http://169.254.170.23/v1/credentials)",
+      "billing-api (previous, 5f8e6c7a9-x1v9c, 2026-09-16 13:50): INFO caller identity: arn:aws:sts::123456789012:assumed-role/eks-prod-billing-api-role/eks-eks-prod-billing-api-sa-…",
+      "eks-pod-identity-agent: INFO no association found for namespace=billing serviceaccount=billing-api; request served without credentials",
+      "deploy (git 9f1e2c4, 2026-09-16 14:20): helm values: serviceAccount.name: billing-api-sa -> billing-api  (chore: drop -sa suffix)"
+    ]
+  }
+}
