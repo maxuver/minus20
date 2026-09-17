@@ -156,7 +156,7 @@ helm upgrade --install m20 deploy/minus20 -n minus20 \
 | Area | State |
 |---|---|
 | `ingest-api` — Alertmanager webhook → Redis Streams | ✅ |
-| `analyzer-worker` — collectors, redaction, budget, dedup, alert-storm grouping, graceful degradation | ✅ |
+| `analyzer-worker` — collectors, redaction, budget, dedup, alert-storm grouping, cross-alert correlation (three alerts at 03:00, one revised hypothesis), graceful degradation | ✅ ([ADR-0006](docs/adr/0006-cross-alert-correlation.md)) |
 | Collectors — Kubernetes events and pod logs, Prometheus, Loki, CloudWatch (Container Insights) | ✅ |
 | LLM backends — local Ollama, any OpenAI-compatible API (DeepSeek, Groq, vLLM…), Anthropic, offline stub | ✅ |
 | Delivery — Slack, Telegram | ✅ |

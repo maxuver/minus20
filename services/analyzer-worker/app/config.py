@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     # window are folded into the first incident (the leader). One model call
     # per storm; the engineer is told the count at a few thresholds.
     storm_window_seconds: int = 120
+    # Correlation (ADR-0006): a different alert in the namespace of an incident
+    # analysed inside this window is attached to it; after the settle period
+    # one revision runs over all of them. 0 disables correlation.
+    correlation_window_seconds: int = 180
+    correlation_settle_seconds: float = 20.0
 
     # --- persistence (ADR-0002: only post-redaction data is stored) ---
     store: str = "memory"  # "memory" | "postgres"

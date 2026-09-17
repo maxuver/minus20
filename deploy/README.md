@@ -181,6 +181,33 @@ incident and never sent to the model. The chat gets one hypothesis and then
 and so on. Measured on kind: one webhook with five alerts, one model call,
 three messages instead of five analyses.
 
+## Correlation: three alerts at 03:00, one hypothesis
+
+The other shape of a night page is a crash loop, a replicas mismatch and an
+error-rate alert firing within a minute in the same namespace: three
+symptoms, one fault. The first alert of a namespace is analysed at once (the
+first hypothesis is never delayed). A later alert of a *different* name in
+that namespace inside `config.correlationWindowSeconds` (default 180) is
+attached to it: its context is collected, redacted and stored, the chat gets
+a one-line "attached to #id", and no separate hypothesis is written. After
+`config.correlationSettleSeconds` (default 20) one revision runs: a single
+model call over the leader's context plus every attached alert's, asking for
+the one cause that explains them all. The leader's hypothesis is replaced,
+the previous cause is kept as "revised from", and the chat gets one message
+listing all the alerts. At most one revision per settle period per
+namespace, across replicas (Redis). Set `correlationWindowSeconds: 0` to
+turn it off. Design and limits: [ADR-0006](../docs/adr/0006-cross-alert-correlation.md).
+
+Measured on kind, 2026-09-17, `qwen2.5:7b` on CPU: `KubePodCrashLooping`,
+`KubeDeploymentReplicasMismatch` and `HighErrorRate` posted 8 s apart in one
+namespace. Leader analysed in 48 s ("PostgreSQL database is unreachable or
+misconfigured"), two members attached with no model call, one revision 20 s
+later in 55 s: "PostgreSQL database outage", confidence high, blast radius
+`cluster`, evidence citing the connection error and the error-rate alert on
+the other pod. Two model calls for three alerts; the previous cause kept as
+`revised_from`. 130 s from the first alert to the revised hypothesis on the
+local model; a cloud model does the same two calls in about 20 s.
+
 ## Real LLM backend
 
 Selecting a backend is one value; the code never changes (ADR-0002).

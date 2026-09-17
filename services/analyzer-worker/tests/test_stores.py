@@ -17,6 +17,10 @@ class FakeConn:
     async def execute(self, sql, *args):
         self.calls.append((sql, args))
 
+    async def fetchval(self, sql, *args):
+        self.calls.append((sql, args))
+        return "Image pull issue"
+
 
 class FakeAcquire:
     def __init__(self, conn):
@@ -76,7 +80,7 @@ async def test_postgres_store_creates_schema_then_inserts():  # CC-29
     assert ["OOMKilling event x3"] in args
     assert "check memory below limit at alert time" in args
     assert ["raise the limit"] in args
-    assert len(args) == 22  # …context, alert→hypothesis time, alert summary, storm bookkeeping
+    assert len(args) == 23  # …context, alert→hypothesis time, alert summary, storm and correlation bookkeeping
 
 
 async def test_postgres_store_creates_schema_only_once():
@@ -102,3 +106,18 @@ async def test_failed_incident_persists_without_hypothesis():
 def test_get_store_selects_by_config():  # CC-30
     assert isinstance(get_store(Settings(store="postgres")), PostgresStore)
     assert isinstance(get_store(Settings(store="memory")), InMemoryStore)
+
+
+async def test_postgres_store_revises_a_leader_in_place():  # ADR-0006
+    pool = FakePool()
+    store = PostgresStore("postgresql://x", pool=pool)
+    assert await store.root_cause("abc") == "Image pull issue"
+    inc = _incident()
+    inc.correlated_alerts = ["HighErrorRate pod=checkout-7"]
+    inc.revised_from = "Image pull issue"
+    await store.revise(inc)
+    update = next(c for c in pool.conn.calls if c[0].strip().startswith("UPDATE incidents SET"))
+    assert update[1][0] == inc.id and update[1][1] == "OOMKilled"
+    assert ["HighErrorRate pod=checkout-7"] in update[1] and "Image pull issue" in update[1]
+    assert "status = 'analyzed'" in update[0] and "revised_from = coalesce(revised_from, $12)" in update[0]
+

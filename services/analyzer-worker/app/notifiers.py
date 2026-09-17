@@ -53,6 +53,13 @@ def format_message(incident: Incident) -> str:
 
     if incident.status is IncidentStatus.ANALYZED and incident.hypothesis:
         h = incident.hypothesis
+        if incident.revised_from or incident.correlated_alerts:
+            n = len(incident.correlated_alerts) + 1
+            lines.append("")
+            lines.append(f"🔗 <b>Correlated:</b> {n} alerts in this namespace, one cause")
+            lines.extend(f"• <code>{escape(a)}</code>" for a in incident.correlated_alerts[:8])
+            if incident.revised_from:
+                lines.append(f"<i>Revised from: {escape(incident.revised_from)}</i>")
         lines.append("")
         lines.append(f"🤖 <b>Likely cause</b> <i>({escape(h.confidence)} confidence)</i>")
         lines.append(escape(h.root_cause))
@@ -91,6 +98,11 @@ def format_message(incident: Incident) -> str:
             lines.append(f"<code>{shown}</code>{escape(more)}")
         lines.append(f"<i>Analysed once as #{incident.grouped_into[:8]}; one shared cause is likely "
                      "(node, rollout, dependency). Members are recorded, not re-analysed.</i>")
+
+    elif incident.status is IncidentStatus.CORRELATED:
+        lines.append("")
+        lines.append(f"🔗 <b>Attached to #{incident.grouped_into[:8]}</b> (same namespace, moments apart)")
+        lines.append(f"<i>{len(incident.correlated_alerts)} alert(s) attached so far; one revised hypothesis over all of them follows.</i>")
 
     elif incident.status is IncidentStatus.BUDGET_EXCEEDED:
         lines.append("")
@@ -134,6 +146,11 @@ def format_slack_blocks(incident: Incident) -> list[dict]:
 
     if incident.status is IncidentStatus.ANALYZED and incident.hypothesis:
         h = incident.hypothesis
+        if incident.revised_from or incident.correlated_alerts:
+            n = len(incident.correlated_alerts) + 1
+            listed = "\n".join(f"• `{esc(a)}`" for a in incident.correlated_alerts[:8])
+            revised = f"\n_Revised from: {esc(incident.revised_from)}_" if incident.revised_from else ""
+            blocks.append(_section(f"*Correlated:* {n} alerts in this namespace, one cause\n{listed}{revised}"))
         blocks.append(
             _section(f"*Likely cause* _({esc(h.confidence)} confidence)_\n{esc(h.root_cause)}")
         )
@@ -165,6 +182,14 @@ def format_slack_blocks(incident: Incident) -> list[dict]:
                 + (f"\n`{pods}`{more}" if pods else "")
                 + f"\n_Analysed once as #{incident.grouped_into[:8]}; one shared cause is likely "
                 "(node, rollout, dependency). Members are recorded, not re-analysed._"
+            )
+        )
+
+    elif incident.status is IncidentStatus.CORRELATED:
+        blocks.append(
+            _section(
+                f"*Attached to #{incident.grouped_into[:8]}* (same namespace, moments apart)"
+                f"\n_{len(incident.correlated_alerts)} alert(s) attached so far; one revised hypothesis over all of them follows._"
             )
         )
 

@@ -58,6 +58,8 @@ _MIGRATIONS = (
     # Storm members point at their leader; the size is the count at write time.
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS grouped_into TEXT",
     "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS storm_size INTEGER",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS correlated_alerts TEXT[]",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS revised_from TEXT",
 )
 
 _INDEXES = (
@@ -70,9 +72,20 @@ INSERT INTO incidents (
     id, fingerprint, alertname, namespace, severity, status,
     root_cause, confidence, blast_radius, evidence, disproof, next_steps,
     backend, cost_usd, latency_ms, failure_reason, created_at, context,
-    time_to_hypothesis_ms, alert_summary, grouped_into, storm_size
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+    time_to_hypothesis_ms, alert_summary, grouped_into, storm_size, correlated_alerts
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 ON CONFLICT (id) DO NOTHING
+"""
+
+# The revision of a correlation leader (ADR-0006) is the one write that
+# changes a hypothesis after the fact; the previous cause is kept.
+_REVISE = """
+UPDATE incidents SET
+    root_cause = $2, confidence = $3, blast_radius = $4, evidence = $5, disproof = $6,
+    next_steps = $7, backend = $8, cost_usd = cost_usd + $9, latency_ms = $10,
+    correlated_alerts = $11, revised_from = coalesce(revised_from, $12), context = $13,
+    status = 'analyzed', failure_reason = NULL
+WHERE id = $1
 """
 
 
@@ -117,6 +130,10 @@ class InMemoryStore:
 
     async def save(self, incident: Incident) -> None:
         self.saved.append(incident)
+
+    async def revise(self, incident: Incident) -> None:
+        """Replace the stored leader with its revised version (same id)."""
+        self.saved = [incident if i.id == incident.id else i for i in self.saved]
 
 
 class PostgresStore:
@@ -174,6 +191,26 @@ class PostgresStore:
                 incident.alert_summary or None,
                 incident.grouped_into or None,
                 incident.storm_size or None,
+                incident.correlated_alerts or None,
+            )
+
+    async def root_cause(self, incident_id: str) -> str:
+        """The cause on record for an incident (for revised_from, whichever replica revises)."""
+        async with self._pool.acquire() as conn:
+            value = await conn.fetchval("SELECT root_cause FROM incidents WHERE id = $1", incident_id)
+        return value or ""
+
+    async def revise(self, incident: Incident) -> None:
+        h = incident.hypothesis
+        if h is None:
+            return
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                _REVISE,
+                incident.id,
+                h.root_cause, h.confidence, h.blast_radius, h.evidence, h.disproof, h.next_steps,
+                incident.backend, incident.cost_usd, incident.latency_ms,
+                incident.correlated_alerts or None, incident.revised_from or None, incident.context,
             )
 
 

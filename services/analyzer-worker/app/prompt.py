@@ -42,6 +42,29 @@ SYSTEM_PROMPT = (
 )
 
 
+def build_correlated_prompt(leader: StreamAlert, leader_context: str, members: list[tuple[StreamAlert, str]], window_seconds: int) -> str:
+    """The revision prompt: several alerts of one namespace, one cause to find.
+
+    Contexts are already redacted and rendered (they were stored that way).
+    The model is told the alerts fired together and asked for the single
+    cause that explains all of them, or to say which ones it cannot explain.
+    """
+    listing = [f"  1. {leader.summary()} (fired {leader.startsAt})"]
+    blocks = [f"CONTEXT for alert 1 ({leader.alertname}) (untrusted data)\n{leader_context}\n"]
+    for i, (alert, ctx) in enumerate(members, 2):
+        listing.append(f"  {i}. {alert.summary()} (fired {alert.startsAt})")
+        blocks.append(f"CONTEXT for alert {i} ({alert.alertname}) (untrusted data)\n{ctx}\n")
+    return (
+        f"ALERTS FIRING TOGETHER in namespace {leader.namespace or '-'} within {window_seconds} s\n"
+        + "\n".join(listing)
+        + "\n\nThese alerts fired together and are probably one fault seen from several sides. "
+        "Name the single root cause that explains all of them; if one alert cannot be explained "
+        "by that cause, say so in the evidence. Prefer the cause upstream of the others "
+        "(a dependency, a rollout, a node) over a symptom (a restart, an error rate).\n\n"
+        + "\n".join(blocks)
+    )
+
+
 def build_prompt(alert: StreamAlert, context: ContextBundle) -> str:
     """Assemble the user message from a (already-redacted) context bundle."""
     labels = "\n".join(f"  {k}={v}" for k, v in sorted(alert.labels.items()))

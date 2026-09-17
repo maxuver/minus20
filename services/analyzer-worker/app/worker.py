@@ -193,6 +193,11 @@ class Worker:
         await self.prune_consumers()
         while not self._stopping:
             await self.run_once()
+        # A correlation revision may be waiting out its settle period; the
+        # grace period (150 s in the chart) is long enough to let it finish.
+        drain = getattr(self._analyzer, "drain", None)
+        if drain is not None:
+            await drain()
         logger.info("analyzer-worker stopped cleanly (consumer=%s)", self._cfg.consumer_name)
 
     def _install_signal_handlers(self) -> None:  # pragma: no cover - process plumbing
@@ -211,6 +216,7 @@ def build_worker(cfg: Settings = settings) -> Worker:  # pragma: no cover - wiri
     from .backends import get_backend
     from .budget import get_budget
     from .collectors import get_collector
+    from .correlation import get_correlation_tracker
     from .dedup import get_deduplicator
     from .notifiers import get_notifier
     from .stores import get_store
@@ -226,6 +232,8 @@ def build_worker(cfg: Settings = settings) -> Worker:  # pragma: no cover - wiri
         llm_timeout_seconds=cfg.llm_timeout_seconds,
         deduplicator=get_deduplicator(redis_client, cfg),
         storm_tracker=get_storm_tracker(redis_client, cfg),
+        correlation_tracker=get_correlation_tracker(redis_client, cfg) if cfg.correlation_window_seconds else None,
+        correlation_settle_seconds=cfg.correlation_settle_seconds,
     )
     return Worker(redis_client, analyzer, cfg)
 

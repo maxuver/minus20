@@ -111,6 +111,9 @@ class IncidentStatus(str, Enum):
     # A member of an alert storm: same alertname+namespace as an incident
     # analysed moments ago (the leader). Recorded and counted, not analysed.
     GROUPED = "grouped"
+    # A different alert in the namespace of an incident analysed moments ago:
+    # attached to that leader; one revision over all of them follows (ADR-0006).
+    CORRELATED = "correlated"
 
 
 class Incident(BaseModel):
@@ -139,6 +142,11 @@ class Incident(BaseModel):
     grouped_into: str = ""
     storm_size: int = 0
     storm_pods: list[str] = Field(default_factory=list)
+    # Correlation (ADR-0006): on a leader after the revision, the alerts the
+    # revised hypothesis explains; on a member, the alerts attached so far.
+    # revised_from keeps the cause the leader had before the revision.
+    correlated_alerts: list[str] = Field(default_factory=list)
+    revised_from: str = ""
     # Exactly what the model was shown, after redaction: the audit trail for
     # "what did it see when it said that". Empty when analysis never ran.
     context: str = ""

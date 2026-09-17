@@ -51,6 +51,12 @@ config:
   # inside this window are folded into the first incident. One model call per
   # storm; the chat gets a count at 2, 5, 10, 25, 50... instead of N messages.
   stormWindowSeconds: 120
+  # Correlation (ADR-0006): a *different* alert in the namespace of an incident
+  # analysed inside this window is attached to it instead of getting its own
+  # hypothesis; after the settle period one revision over all attached alerts
+  # replaces the leader's hypothesis. 0 disables correlation.
+  correlationWindowSeconds: 180
+  correlationSettleSeconds: 20
   # Hard ceiling on one analysis call. A 7B model on CPU needs 30-60s; a cloud
   # model answers in a few seconds. Past it the raw alert is still delivered.
   llmTimeoutSeconds: 90

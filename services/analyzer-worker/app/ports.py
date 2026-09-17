@@ -53,6 +53,15 @@ class StormTracker(Protocol):
     async def track(self, alert: StreamAlert, incident_id: str): ...
 
 
+@runtime_checkable
+class CorrelationTracker(Protocol):
+    async def track(self, alert: StreamAlert, incident_id: str, context: str): ...
+
+    async def bundle(self, alert: StreamAlert): ...
+
+    async def claim_revision(self, alert: StreamAlert, hold_seconds: float) -> bool: ...
+
+
 class BackendError(RuntimeError):
     """Raised by an LLM backend when it cannot produce a hypothesis.
 

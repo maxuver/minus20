@@ -68,7 +68,11 @@ second.
    (the same alert again) and the storm window (a different pod, same
    alertname and namespace, moments later: recorded and counted as a member
    of the first incident, not analysed), and runs the collectors: Kubernetes events (`kubectl describe`-level),
-   PromQL instant queries, LogQL over a bounded window. Fixed set, small caps.
+   pod logs, PromQL instant queries, LogQL over a bounded window, CloudWatch. Fixed set, small caps.
+   A *different* alert in a namespace with a fresh incident is attached to it
+   (status `correlated`); after a short settle period one revision call over
+   all attached contexts replaces the leader's hypothesis, the previous cause
+   kept as `revised_from` (ADR-0006). The first hypothesis is never delayed.
 3. **Redaction** masks e-mails, IPs, tokens, cloud keys and secret-shaped
    values in everything collected. It runs before any model call and has no
    off switch (ADR-0002).
@@ -118,3 +122,4 @@ scanning. `infra/terraform` stands up an ephemeral EKS for the same chart.
 - [ADR-0003](adr/0003-graceful-degradation.md) — the AI is an overlay; the alert always arrives
 - [ADR-0004](adr/0004-hypothesis-evidence-and-blast-radius.md) — a hypothesis carries evidence, its disproof and blast radius
 - [ADR-0005](adr/0005-reflex-and-deliberate-agent.md) — reflex and deliberate agent as separate processes
+- [ADR-0006](adr/0006-cross-alert-correlation.md) — different alerts of one namespace: one incident, one bounded revision
