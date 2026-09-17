@@ -1,13 +1,21 @@
-# SentinelOps
+# Minus20
 
-**An alert tells you *what* broke. It never tells you *why*.**
+**Minus twenty minutes of not knowing.**
 
-SentinelOps automates the first twenty minutes of every Kubernetes incident. It
-reacts to an Alertmanager webhook, collects the context an engineer would gather
-by hand — Kubernetes events, Prometheus metrics, Loki logs — and returns a ranked
-root-cause hypothesis with the evidence behind it, in seconds.
+An alert tells you *what* broke. It never tells you *why*. The twenty minutes
+that follow, at 03:00, are spent assembling context by hand and guessing.
+Minus20 takes those minutes off every Kubernetes incident: it reacts to the
+Alertmanager webhook, collects what an engineer would gather (Kubernetes
+events, pod logs, Prometheus, Loki, CloudWatch), and puts a falsifiable
+root-cause hypothesis with its evidence in your chat, in under a minute on a
+cloud model and about two on a local one. Inside your cluster; the logs never
+leave.
 
 It never acts on your cluster. It recommends; the engineer decides.
+
+*Until 2026-09-17 this project was called SentinelOps; the old repository URL,
+chart and image names redirect or remain, and `SENTINELOPS_*` environment
+variables became `MINUS20_*`.*
 
 ---
 
@@ -46,11 +54,11 @@ push to `main`, so there is nothing to clone or build. Offline defaults mean
 no API key is needed either.
 
 ```bash
-helm upgrade --install so oci://ghcr.io/maxuver/charts/sentinelops -n sentinelops --create-namespace
-kubectl -n sentinelops rollout status deploy/so-analyzer-worker
+helm upgrade --install m20 oci://ghcr.io/maxuver/charts/minus20 -n minus20 --create-namespace
+kubectl -n minus20 rollout status deploy/m20-analyzer-worker
 ```
 
-From a checkout, `deploy/sentinelops` works in place of the OCI reference.
+From a checkout, `deploy/minus20` works in place of the OCI reference.
 
 No cluster handy? `kind create cluster --config kind/cluster.yaml` gives you one
 in a minute.
@@ -58,10 +66,10 @@ in a minute.
 Break something on purpose and watch it work:
 
 ```bash
-kubectl -n sentinelops run billing-api --image=busybox --command -- \
+kubectl -n minus20 run billing-api --image=busybox --command -- \
   sh -c "echo 'ERROR could not connect to postgres:5432'; sleep 2; exit 1"
 
-kubectl -n sentinelops logs -f deploy/so-analyzer-worker
+kubectl -n minus20 logs -f deploy/m20-analyzer-worker
 ```
 
 Full deployment guide, including the monitoring stack and the autonomous
@@ -108,7 +116,7 @@ Anthropic works through the same interface. Selecting a backend is one value,
 never a code change.
 
 ```bash
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.llmProvider=ollama \
   --set config.ollamaUrl=http://host.docker.internal:11434 \
   --set config.collectors='k8s-events\,prometheus\,loki' \
@@ -121,7 +129,7 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 
 1. **The AI is an overlay, never a dependency.** Ingestion is decoupled behind a
    length-capped Redis Stream, analysis has a hard timeout and a daily budget cap,
-   and the raw alert is delivered even when the model is down. Switch SentinelOps
+   and the raw alert is delivered even when the model is down. Switch Minus20
    off and you are back to exactly what you had before.
    ([ADR-0003](docs/adr/0003-graceful-degradation.md))
 2. **Your logs never leave without permission.** Non-bypassable PII redaction
@@ -190,7 +198,7 @@ services/
     scenarios/       recorded fault-injection scenarios
   web-ui/            read-only incident history (FastAPI + Jinja2)
 deploy/
-  sentinelops/       Helm chart (services, RBAC, Postgres)
+  minus20/       Helm chart (services, RBAC, Postgres)
 infra/terraform/     AWS VPC + EKS (applied once for real, see docs/EKS-RUN.md)
 kind/                local cluster and monitoring stack config
 docs/
@@ -213,9 +221,9 @@ ruff check app tests && pytest
 Build with a `:dev` tag, side-load it, and point the chart at it:
 
 ```bash
-docker build services/analyzer-worker -t sentinelops/analyzer-worker:dev
-kind load docker-image sentinelops/analyzer-worker:dev --name sentinelops
-helm upgrade --install so deploy/sentinelops -n sentinelops   --set images.analyzer=sentinelops/analyzer-worker:dev
+docker build services/analyzer-worker -t minus20/analyzer-worker:dev
+kind load docker-image minus20/analyzer-worker:dev --name minus20
+helm upgrade --install m20 deploy/minus20 -n minus20   --set images.analyzer=minus20/analyzer-worker:dev
 ```
 
 ## License

@@ -22,7 +22,7 @@ def raw_payload() -> dict:
         "startsAt": "2026-07-28T03:12:45Z",
         "fingerprint": "b0e0b3cbc9d21c48",
         "groupKey": '{}:{alertname="KubePodCrashLooping"}',
-        "receiver": "sentinelops",
+        "receiver": "minus20",
     }
 
 

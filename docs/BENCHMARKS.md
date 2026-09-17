@@ -54,7 +54,7 @@ run never completed in one pass. Across the two partial runs every scenario
 it did answer was correct (missing Secret, NetworkPolicy, rollout, sidecar,
 unrotated log, IP exhaustion); the config-mismatch scenario was never served.
 Reported as such rather than as 7/7. The replay harness gained
-`SENTINELOPS_REPLAY_PAUSE_SECONDS` for metered tiers, and the adapter retries
+`MINUS20_REPLAY_PAUSE_SECONDS` for metered tiers, and the adapter retries
 429/503 twice with short delays.
 
 On the 7B model the prompt change moved one scenario from wrong to right and
@@ -86,7 +86,7 @@ The two passes and the three failures split cleanly:
   failures the disproving evidence was in the context and was not used.
 
 This was a limit of a 7B model, not of the pipeline, and the second run
-proves it: with nothing changed but `SENTINELOPS_LLM_PROVIDER`, a current
+proves it: with nothing changed but `MINUS20_LLM_PROVIDER`, a current
 cloud model gets all five, in a quarter of the time. The three cases the 7B
 model failed were exactly the ones needing elimination ("the database answers
 normally, so it is not the database"), and the larger model does that
@@ -115,9 +115,9 @@ worth doing, and is the next item.
 cd services/analyzer-worker
 pip install -r requirements-dev.txt
 
-SENTINELOPS_LLM_PROVIDER=ollama \
-SENTINELOPS_OLLAMA_MODEL=qwen2.5:7b \
-SENTINELOPS_LLM_TIMEOUT_SECONDS=300 \
+MINUS20_LLM_PROVIDER=ollama \
+MINUS20_OLLAMA_MODEL=qwen2.5:7b \
+MINUS20_LLM_TIMEOUT_SECONDS=300 \
 python -m app.replay scenarios/hard
 ```
 
@@ -125,10 +125,10 @@ Swap `scenarios/hard` for the default directory to run the easy set. For the
 cloud run:
 
 ```bash
-SENTINELOPS_LLM_PROVIDER=openai \
-SENTINELOPS_OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
-SENTINELOPS_OPENAI_MODEL=gemini-3.6-flash \
-SENTINELOPS_OPENAI_API_KEY=... \
+MINUS20_LLM_PROVIDER=openai \
+MINUS20_OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
+MINUS20_OPENAI_MODEL=gemini-3.6-flash \
+MINUS20_OPENAI_API_KEY=... \
 python -m app.replay scenarios/hard
 ```
 
@@ -149,7 +149,7 @@ bot record what actually happened, and every such incident already holds the
 redacted context the model saw. So the store is an eval set:
 
 ```bash
-SENTINELOPS_POSTGRES_DSN=postgres://... \
+MINUS20_POSTGRES_DSN=postgres://... \
 python -m app.replay --from-store --days 90
 ```
 

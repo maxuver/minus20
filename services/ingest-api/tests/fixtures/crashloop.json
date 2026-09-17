@@ -2,7 +2,7 @@
   "version": "4",
   "groupKey": "{}:{alertname=\"KubePodCrashLooping\"}",
   "status": "firing",
-  "receiver": "sentinelops",
+  "receiver": "minus20",
   "groupLabels": { "alertname": "KubePodCrashLooping" },
   "commonLabels": {
     "alertname": "KubePodCrashLooping",

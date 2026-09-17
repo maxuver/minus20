@@ -24,7 +24,7 @@ from ..config import Settings, settings
 from ..models import StreamAlert
 from ..redaction import redact
 
-logger = logging.getLogger("sentinelops.agent.tools")
+logger = logging.getLogger("minus20.agent.tools")
 
 MAX_TOOL_OUTPUT_CHARS = 6_000
 
@@ -305,7 +305,7 @@ TOOLS: dict[str, Tool] = {
     for t in (
         Tool(
             "recent_incidents",
-            "List incidents SentinelOps analysed recently, newest first, with the "
+            "List incidents Minus20 analysed recently, newest first, with the "
             "engineer's verdict when one was given. Start here for 'what happened'.",
             {
                 "type": "object",

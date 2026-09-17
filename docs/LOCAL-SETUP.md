@@ -52,23 +52,23 @@ helm install monitoring prometheus-community/kube-prometheus-stack \
 Grafana lands on <http://localhost:3000>, Prometheus on <http://localhost:9090>,
 Alertmanager on <http://localhost:9093> (port mappings come from the kind config).
 
-## 3. Point Alertmanager at SentinelOps
+## 3. Point Alertmanager at Minus20
 
 Alertmanager reaches the ingest service through a webhook receiver — that single
 config block is the entire integration surface:
 
 ```yaml
 receivers:
-  - name: sentinelops
+  - name: minus20
     webhook_configs:
-      - url: http://ingest-api.sentinelops.svc.cluster.local:8080/webhook/alertmanager
+      - url: http://ingest-api.minus20.svc.cluster.local:8080/webhook/alertmanager
         send_resolved: true
 ```
 
 ## 4. Tear down
 
 ```bash
-kind delete cluster --name sentinelops
+kind delete cluster --name minus20
 ```
 
 The cluster is disposable — everything above is reproducible from this file.

@@ -13,7 +13,7 @@ variable "aws_profile" {
 variable "cluster_name" {
   description = "EKS cluster name."
   type        = string
-  default     = "sentinelops"
+  default     = "minus20"
 }
 
 variable "cluster_version" {
@@ -38,7 +38,7 @@ variable "tags" {
   description = "Tags applied to all resources."
   type        = map(string)
   default = {
-    Project   = "sentinelops"
+    Project   = "minus20"
     ManagedBy = "terraform"
     Lifecycle = "ephemeral" # apply -> demo -> destroy
   }

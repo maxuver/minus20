@@ -6,7 +6,7 @@ Two adapters behind the same `save()` port:
 - PostgresStore: the incident-history dataset. Only post-redaction data ever
   reaches it, because the Analyzer redacts before it builds the incident.
 
-Selecting one is configuration (SENTINELOPS_STORE), never code.
+Selecting one is configuration (MINUS20_STORE), never code.
 """
 
 from __future__ import annotations

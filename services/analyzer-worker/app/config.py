@@ -2,16 +2,16 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Runtime configuration, read from SENTINELOPS_* environment variables.
+    """Runtime configuration, read from MINUS20_* environment variables.
 
     Shares the alert-stream settings with ingest-api by convention (same
-    SENTINELOPS_ prefix, same defaults) so the two services agree on the queue.
+    MINUS20_ prefix, same defaults) so the two services agree on the queue.
     """
 
     # --- queue (must match ingest-api) ---
     redis_url: str = "redis://localhost:6379/0"
-    alerts_stream: str = "sentinelops:alerts"
-    dead_letter_stream: str = "sentinelops:alerts:dead"
+    alerts_stream: str = "minus20:alerts"
+    dead_letter_stream: str = "minus20:alerts:dead"
     consumer_group: str = "analyzers"
     consumer_name: str = "analyzer-1"
     # XREADGROUP tuning: how many messages to pull and how long to block (ms).
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
 
     # --- persistence (ADR-0002: only post-redaction data is stored) ---
     store: str = "memory"  # "memory" | "postgres"
-    postgres_dsn: str = "postgresql://sentinel:sentinel@localhost:5432/sentinelops"
+    postgres_dsn: str = "postgresql://minus20:minus20@localhost:5432/minus20"
 
     # --- delivery ---
     notifier: str = "stub"  # "telegram" | "slack" | "stub"
@@ -127,7 +127,7 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    model_config = {"env_prefix": "SENTINELOPS_"}
+    model_config = {"env_prefix": "MINUS20_"}
 
 
 settings = Settings()

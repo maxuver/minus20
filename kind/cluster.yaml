@@ -1,11 +1,11 @@
-# Local SentinelOps development cluster.
+# Local Minus20 development cluster.
 #
 # Three nodes on purpose: a single-node cluster hides scheduling behaviour, and
 # several fault-injection scenarios (node pressure, eviction, anti-affinity)
 # only reproduce with real workers.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: sentinelops
+name: minus20
 
 nodes:
   - role: control-plane

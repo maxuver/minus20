@@ -44,7 +44,7 @@ Alertmanager ──► ingest-api ──► Redis Stream ──► analyzer-work
                                                       ├─► Postgres ◄──────────────┐
                                                       └─► Slack / Telegram        │
                                                                                   │
-Engineer in chat ──► sentinel-agent                                   DELIBERATE  │
+Engineer in chat ──► minus20-agent                                   DELIBERATE  │
    "why did billing-api crash?"     tool-calling loop, on demand ─────────────────┘
    "what changed in the hour before?"   tools: read-only collectors only
    "/report week"                       memory: past incidents + resolutions + runbooks
@@ -55,7 +55,7 @@ Engineer in chat ──► sentinel-agent                                   DELI
 every alert, bounded in time and cost, and is the only thing the alert path
 depends on.
 
-**Deliberate** is a new service, `sentinel-agent`. It lives in the team's chat
+**Deliberate** is a new service, `minus20-agent`. It lives in the team's chat
 and runs only when a human asks. It is a small, purpose-built loop, not a
 general harness:
 

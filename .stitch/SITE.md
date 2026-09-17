@@ -1,4 +1,4 @@
-# SentinelOps — Site Vision
+# Minus20 — Site Vision
 
 **Stitch Project ID:** _(not created yet — see `.stitch/metadata.json`)_
 **Output directory:** `site/public/`
@@ -23,7 +23,7 @@ marketing language.
 
 ## 3. The one message
 
-> An alert tells you *what* broke, not *why*. SentinelOps automates the first 20
+> An alert tells you *what* broke, not *why*. Minus20 automates the first 20
 > minutes of every incident and hands the engineer a root-cause hypothesis with
 > the evidence behind it — in seconds. It never acts on the cluster, and the raw
 > alert always gets through.

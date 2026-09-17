@@ -1,4 +1,4 @@
-# The identity SentinelOps runs as when it reads CloudWatch.
+# The identity Minus20 runs as when it reads CloudWatch.
 #
 # The chart's ServiceAccount (`<release>-analyzer`) gets an IAM role through
 # EKS Pod Identity: no keys in Secrets, no key rotation, and the policy is
@@ -6,19 +6,19 @@
 # Logs Insights queries and metric reads. Nothing that writes, nothing
 # outside CloudWatch.
 
-variable "sentinelops_namespace" {
+variable "minus20_namespace" {
   description = "Namespace the chart is installed into."
   type        = string
-  default     = "sentinelops"
+  default     = "minus20"
 }
 
-variable "sentinelops_release" {
+variable "minus20_release" {
   description = "Helm release name; the ServiceAccount is <release>-analyzer."
   type        = string
   default     = "so"
 }
 
-data "aws_iam_policy_document" "sentinelops_trust" {
+data "aws_iam_policy_document" "minus20_trust" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole", "sts:TagSession"]
@@ -29,7 +29,7 @@ data "aws_iam_policy_document" "sentinelops_trust" {
   }
 }
 
-data "aws_iam_policy_document" "sentinelops_cloudwatch_read" {
+data "aws_iam_policy_document" "minus20_cloudwatch_read" {
   statement {
     sid    = "LogsInsightsRead"
     effect = "Allow"
@@ -49,27 +49,27 @@ data "aws_iam_policy_document" "sentinelops_cloudwatch_read" {
   }
 }
 
-resource "aws_iam_role" "sentinelops" {
-  name               = "${var.cluster_name}-sentinelops-reader"
-  assume_role_policy = data.aws_iam_policy_document.sentinelops_trust.json
+resource "aws_iam_role" "minus20" {
+  name               = "${var.cluster_name}-minus20-reader"
+  assume_role_policy = data.aws_iam_policy_document.minus20_trust.json
   tags               = var.tags
 }
 
-resource "aws_iam_role_policy" "sentinelops_cloudwatch_read" {
+resource "aws_iam_role_policy" "minus20_cloudwatch_read" {
   name   = "cloudwatch-read"
-  role   = aws_iam_role.sentinelops.id
-  policy = data.aws_iam_policy_document.sentinelops_cloudwatch_read.json
+  role   = aws_iam_role.minus20.id
+  policy = data.aws_iam_policy_document.minus20_cloudwatch_read.json
 }
 
-resource "aws_eks_pod_identity_association" "sentinelops" {
+resource "aws_eks_pod_identity_association" "minus20" {
   cluster_name    = module.eks.cluster_name
-  namespace       = var.sentinelops_namespace
-  service_account = "${var.sentinelops_release}-analyzer"
-  role_arn        = aws_iam_role.sentinelops.arn
+  namespace       = var.minus20_namespace
+  service_account = "${var.minus20_release}-analyzer"
+  role_arn        = aws_iam_role.minus20.arn
   tags            = var.tags
 }
 
-output "sentinelops_role_arn" {
+output "minus20_role_arn" {
   description = "Role the chart's ServiceAccount assumes through Pod Identity."
-  value       = aws_iam_role.sentinelops.arn
+  value       = aws_iam_role.minus20.arn
 }

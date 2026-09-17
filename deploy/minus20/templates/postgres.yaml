@@ -8,7 +8,7 @@ kind: Secret
 metadata:
   name: {{ .Release.Name }}-postgres-dsn
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 type: Opaque
 stringData:
   dsn: postgresql://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.database }}
@@ -24,7 +24,7 @@ kind: Secret
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 type: Opaque
 stringData:
   password: {{ .Values.postgres.password | quote }}
@@ -34,7 +34,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 spec:
   accessModes: ["ReadWriteOnce"]
   {{- if .Values.postgres.storageClass }}
@@ -49,7 +49,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
   replicas: 1
@@ -103,7 +103,7 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 spec:
   selector:
     app.kubernetes.io/component: postgres

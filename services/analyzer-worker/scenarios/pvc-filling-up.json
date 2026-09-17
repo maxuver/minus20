@@ -17,7 +17,7 @@
   },
   "context": {
     "k8s_events": [
-      "Warning FreeDiskSpaceFailed node/sentinelops-worker2: failed to garbage collect required amount of images"
+      "Warning FreeDiskSpaceFailed node/minus20-worker2: failed to garbage collect required amount of images"
     ],
     "metrics": [
       "kubelet_volume_stats_available_bytes{persistentvolumeclaim=\"data-postgres-0\"} = 104857600",

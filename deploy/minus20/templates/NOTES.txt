@@ -1,4 +1,4 @@
-SentinelOps is installed in namespace {{ .Release.Namespace }}.
+Minus20 is installed in namespace {{ .Release.Namespace }}.
 
 Pipeline: Alertmanager webhook -> ingest-api -> Redis Streams -> analyzer-worker.
 LLM backend: {{ .Values.config.llmProvider }} | collectors: {{ .Values.config.collectors }}

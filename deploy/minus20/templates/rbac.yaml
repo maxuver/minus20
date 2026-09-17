@@ -6,7 +6,7 @@ kind: ServiceAccount
 metadata:
   name: {{ .Release.Name }}-analyzer
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 ---
 {{- if .Values.rbac.clusterWide }}
 apiVersion: rbac.authorization.k8s.io/v1
@@ -14,7 +14,7 @@ kind: ClusterRole
 metadata:
   name: {{ .Release.Name }}-analyzer-events-reader
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["events"]
@@ -38,7 +38,7 @@ kind: ClusterRoleBinding
 metadata:
   name: {{ .Release.Name }}-analyzer-events-reader
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -53,7 +53,7 @@ kind: Role
 metadata:
   name: {{ .Release.Name }}-analyzer-events-reader
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["events"]
@@ -72,7 +72,7 @@ kind: RoleBinding
 metadata:
   name: {{ .Release.Name }}-analyzer-events-reader
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

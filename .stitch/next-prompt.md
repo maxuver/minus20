@@ -1,7 +1,7 @@
 ---
 page: index
 ---
-The single landing page for SentinelOps, an AI-assisted incident-triage layer for
+The single landing page for Minus20, an AI-assisted incident-triage layer for
 Kubernetes. Audience: platform engineers, SRE leads and CTOs who run Kubernetes
 with an on-call rotation. They scroll fast, look for the architecture, and bounce
 on marketing language.
@@ -18,7 +18,7 @@ Feels like Linear, Vercel or Grafana docs — precise, fast, understated.
 No stock photography, no gradients-as-decoration, no marketing superlatives.
 
 **Page Structure:**
-1. Hero. Headline: "An alert tells you what broke. Not why." Subline: SentinelOps
+1. Hero. Headline: "An alert tells you what broke. Not why." Subline: Minus20
    collects the context an engineer would gather by hand and returns a ranked
    root-cause hypothesis in seconds. Primary CTA "View on GitHub", secondary
    "How it works".

@@ -7,7 +7,7 @@ grafana:
   service:
     type: NodePort
     nodePort: 30300
-  adminPassword: sentinelops
+  adminPassword: minus20
   # Keep the footprint small — this runs alongside a local LLM.
   resources:
     requests: { cpu: 50m, memory: 128Mi }
@@ -28,10 +28,10 @@ alertmanager:
   alertmanagerSpec:
     resources:
       requests: { cpu: 25m, memory: 64Mi }
-  # Route Kubernetes crash-loop alerts to the SentinelOps ingest-api webhook.
-  # Everything else goes to the null receiver, so only the alerts SentinelOps
+  # Route Kubernetes crash-loop alerts to the Minus20 ingest-api webhook.
+  # Everything else goes to the null receiver, so only the alerts Minus20
   # handles reach the pipeline. This is the real architecture: Alertmanager is
-  # the source of truth for what is firing; SentinelOps is an overlay on it.
+  # the source of truth for what is firing; Minus20 is an overlay on it.
   config:
     route:
       receiver: "null"
@@ -40,14 +40,14 @@ alertmanager:
       group_interval: 30s
       repeat_interval: 1h
       routes:
-        - receiver: "sentinelops"
+        - receiver: "minus20"
           matchers:
             - alertname =~ "KubePodCrashLooping.*"
     receivers:
       - name: "null"
-      - name: "sentinelops"
+      - name: "minus20"
         webhook_configs:
-          - url: "http://so-ingest-api.sentinelops:8080/webhook/alertmanager"
+          - url: "http://m20-ingest-api.minus20:8080/webhook/alertmanager"
             send_resolved: false
 
 # Not useful on kind, and they generate noise that pollutes fault-injection runs.

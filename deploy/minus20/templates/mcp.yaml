@@ -1,13 +1,13 @@
 {{- if .Values.mcp.enabled }}
 # The same read-only tools as the agent, served over MCP (streamable HTTP) so
-# any agent CLI (Gemini CLI, Claude Code, Cursor) can use SentinelOps as its
+# any agent CLI (Gemini CLI, Claude Code, Cursor) can use Minus20 as its
 # memory of this cluster. ClusterIP only: reach it with kubectl port-forward.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-mcp
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp
 spec:
   replicas: 1
@@ -31,16 +31,16 @@ spec:
             - configMapRef:
                 name: {{ .Release.Name }}-config
           env:
-            - name: SENTINELOPS_MCP_TRANSPORT
+            - name: MINUS20_MCP_TRANSPORT
               value: http
-            - name: SENTINELOPS_MCP_PORT
+            - name: MINUS20_MCP_PORT
               value: {{ .Values.mcp.port | quote }}
-            - name: SENTINELOPS_EMBED_MODEL
+            - name: MINUS20_EMBED_MODEL
               value: {{ .Values.agent.embedModel | quote }}
-            - name: SENTINELOPS_EMBED_DIM
+            - name: MINUS20_EMBED_DIM
               value: {{ .Values.agent.embedDim | quote }}
             {{- if eq .Values.config.store "postgres" }}
-            - name: SENTINELOPS_POSTGRES_DSN
+            - name: MINUS20_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-postgres-dsn
@@ -61,7 +61,7 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-mcp
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp
 spec:
   type: ClusterIP

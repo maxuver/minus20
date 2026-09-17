@@ -9,7 +9,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-web-ui
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: web-ui
 spec:
   replicas: 1
@@ -28,12 +28,12 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            - name: SENTINELOPS_POSTGRES_DSN
+            - name: MINUS20_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-postgres-dsn
                   key: dsn
-            - name: SENTINELOPS_LOG_LEVEL
+            - name: MINUS20_LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
           readinessProbe:
             httpGet:
@@ -55,7 +55,7 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-web-ui
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 spec:
   type: ClusterIP # intentionally not exposed; see the security note above
   selector:

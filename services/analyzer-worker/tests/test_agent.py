@@ -263,9 +263,9 @@ async def test_pod_logs_falls_back_to_the_kubernetes_api_without_loki():
             return ""  # the live container has printed nothing yet
 
     ctx = tools.ToolContext(cfg=_cfg(collectors="k8s-events"), k8s_api=Core())
-    out = await tools.run(ctx, "pod_logs", {"namespace": "sentinelops", "pod": "billing-api"})
+    out = await tools.run(ctx, "pod_logs", {"namespace": "minus20", "pod": "billing-api"})
     assert "previous container" in out and "postgres:5432" in out
-    assert "name the pod" in await tools.run(ctx, "pod_logs", {"namespace": "sentinelops"})
+    assert "name the pod" in await tools.run(ctx, "pod_logs", {"namespace": "minus20"})
 
 
 async def test_node_status_reports_pressure_and_node_warnings():
@@ -618,7 +618,7 @@ async def test_bot_report_is_monospace_and_survives_no_model():
 
 async def test_bot_group_command_suffix_is_stripped():
     bot, _ = _bot()
-    assert (await bot.dispatch("42", "/help@SentinelBot")).text == HELP
+    assert (await bot.dispatch("42", "/help@Minus20Bot")).text == HELP
 
 
 async def test_bot_answers_every_request_in_one_message():

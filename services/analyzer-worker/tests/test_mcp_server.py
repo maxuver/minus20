@@ -66,7 +66,7 @@ async def test_mcp_pod_logs_reads_previous_container_via_k8s_api():
             return "ERROR could not connect to postgres:5432" if previous else ""
 
     async with Client(build_server(_ctx(k8s_api=Core()))) as client:
-        result = await client.call_tool("pod_logs", {"namespace": "sentinelops", "pod": "billing-api"})
+        result = await client.call_tool("pod_logs", {"namespace": "minus20", "pod": "billing-api"})
     text = "".join(getattr(c, "text", "") for c in result.content)
     assert "previous container" in text and "postgres:5432" in text
 

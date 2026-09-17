@@ -3,8 +3,13 @@
 # bucket. Terraform >= 1.10 locks state natively in S3 (`use_lockfile`), so no
 # DynamoDB table is needed any more.
 #
+# The bucket name keeps the project's previous name (sentinelops): S3 buckets
+# cannot be renamed and the live state sits in it. Changing the prefix here
+# would make Terraform replace the bucket. New users get whatever prefix they
+# set; the name is an identifier, not the brand.
+#
 #   cd infra/terraform/bootstrap
-#   AWS_PROFILE=sentinelops terraform init && terraform apply
+#   AWS_PROFILE=minus20 terraform init && terraform apply
 #   terraform output -raw backend_hcl > ../backend.hcl      # gitignored
 #   cd .. && terraform init -migrate-state -backend-config=backend.hcl
 

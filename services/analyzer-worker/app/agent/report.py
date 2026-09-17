@@ -24,7 +24,7 @@ from typing import Any
 from ..ports import BackendError
 from .chat import ChatBackend
 
-logger = logging.getLogger("sentinelops.agent.report")
+logger = logging.getLogger("minus20.agent.report")
 
 NIGHT_HOURS = set(range(7)) | {22, 23}  # 22:00–06:59 UTC
 

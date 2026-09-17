@@ -1,9 +1,9 @@
 apiVersion: v2
-name: sentinelops
+name: minus20
 description: AI-assisted incident triage for Kubernetes (ingest-api, analyzer-worker, web-ui, Redis, Postgres)
 type: application
-version: 0.10.0
-appVersion: "0.9.0"
-home: https://github.com/maxuver/sentinelops
+version: 0.11.0
+appVersion: "0.11.0"
+home: https://github.com/maxuver/minus20
 sources:
-  - https://github.com/maxuver/sentinelops
+  - https://github.com/maxuver/minus20

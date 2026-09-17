@@ -1,7 +1,7 @@
-"""SentinelOps as an MCP server: the same read-only tools, for any agent.
+"""Minus20 as an MCP server: the same read-only tools, for any agent.
 
 Gemini CLI, Claude Code, Cursor and the rest all speak the Model Context
-Protocol. Rather than compete with them for the terminal, SentinelOps offers
+Protocol. Rather than compete with them for the terminal, Minus20 offers
 them what they lack: memory of this cluster's incidents, the engineer's real
 resolutions, and the same bounded observations the built-in agent uses.
 
@@ -11,7 +11,7 @@ same code path, and there is still no tool that can change anything. Each tool
 is annotated read-only/non-destructive so a client can show that to its user.
 
     python -m app.mcp_server            # stdio, for a local agent CLI
-    SENTINELOPS_MCP_TRANSPORT=http ...   # streamable HTTP, in-cluster
+    MINUS20_MCP_TRANSPORT=http ...   # streamable HTTP, in-cluster
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from .agent.memory import Memory, OllamaEmbedder
 from .agent.tools import ToolContext
 from .config import Settings, settings
 
-logger = logging.getLogger("sentinelops.mcp")
+logger = logging.getLogger("minus20.mcp")
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 
@@ -49,7 +49,7 @@ class _State:
 
     def get(self) -> ToolContext:
         if self.ctx is None:
-            raise RuntimeError("SentinelOps MCP server is not initialised")
+            raise RuntimeError("Minus20 MCP server is not initialised")
         return self.ctx
 
 
@@ -88,7 +88,7 @@ def build_server(ctx: ToolContext | None = None, cfg: Settings = settings) -> MC
             if owned and state.ctx is not None:
                 await state.ctx.close()
 
-    server = MCPServer(name="sentinelops", instructions=INSTRUCTIONS, lifespan=lifespan)
+    server = MCPServer(name="minus20", instructions=INSTRUCTIONS, lifespan=lifespan)
 
     async def recent_incidents(hours: int = 24, namespace: str | None = None, limit: int = 10) -> str:
         return await tools.run(state.get(), "recent_incidents", {"hours": hours, "namespace": namespace, "limit": limit})

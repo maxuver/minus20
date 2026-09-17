@@ -303,7 +303,7 @@ def _cloudwatch_logs(cfg):
     from .cloudwatch import CloudWatchLogsCollector
 
     if not cfg.cloudwatch_log_group:
-        raise ValueError("cloudwatch-logs needs SENTINELOPS_CLOUDWATCH_LOG_GROUP")
+        raise ValueError("cloudwatch-logs needs MINUS20_CLOUDWATCH_LOG_GROUP")
     return CloudWatchLogsCollector(
         cfg.cloudwatch_log_group, region=cfg.aws_region,
         max_lines=cfg.loki_max_lines, window_minutes=cfg.loki_window_minutes,
@@ -314,7 +314,7 @@ def _cloudwatch_metrics(cfg):
     from .cloudwatch import CloudWatchMetricsCollector
 
     if not cfg.cloudwatch_cluster_name:
-        raise ValueError("cloudwatch-metrics needs SENTINELOPS_CLOUDWATCH_CLUSTER_NAME")
+        raise ValueError("cloudwatch-metrics needs MINUS20_CLOUDWATCH_CLUSTER_NAME")
     return CloudWatchMetricsCollector(
         cfg.cloudwatch_cluster_name, region=cfg.aws_region, window_minutes=cfg.loki_window_minutes
     )
@@ -334,7 +334,7 @@ _REGISTRY = {
 
 
 def get_collector(cfg: Settings = settings) -> Collector:
-    """Build the configured collectors (comma-separated `SENTINELOPS_COLLECTORS`).
+    """Build the configured collectors (comma-separated `MINUS20_COLLECTORS`).
 
     Wrapped in AggregateCollector so one dead datasource degrades context rather
     than failing the analysis, and so new collectors are added by config, not code.

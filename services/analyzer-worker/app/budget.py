@@ -38,7 +38,7 @@ class InMemoryBudget:
 class RedisBudget:
     """Shared budget across worker replicas, backed by a dated Redis counter."""
 
-    def __init__(self, redis, cap_usd: float, prefix: str = "sentinelops:budget") -> None:
+    def __init__(self, redis, cap_usd: float, prefix: str = "minus20:budget") -> None:
         self._redis = redis
         self._cap = cap_usd
         self._prefix = prefix

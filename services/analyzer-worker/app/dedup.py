@@ -17,7 +17,7 @@ import time
 from .config import Settings, settings
 from .models import StreamAlert
 
-_PREFIX = "sentinelops:seen"
+_PREFIX = "minus20:seen"
 
 
 def alert_key(alert: StreamAlert) -> str:

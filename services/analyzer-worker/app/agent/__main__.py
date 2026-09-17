@@ -20,7 +20,7 @@ from .memory import Memory, OllamaEmbedder
 from .telegram import TelegramBot
 from .tools import ToolContext
 
-logger = logging.getLogger("sentinelops.agent")
+logger = logging.getLogger("minus20.agent")
 
 
 async def build() -> TelegramBot:
@@ -40,7 +40,7 @@ async def build() -> TelegramBot:
             except Exception as exc:  # noqa: BLE001 - e.g. embedding model not pulled yet
                 logger.warning("initial indexing failed, memory stays on for later: %s", exc)
     else:
-        logger.warning("SENTINELOPS_STORE is not postgres: no incident history, no memory")
+        logger.warning("MINUS20_STORE is not postgres: no incident history, no memory")
 
     chat = get_chat_backend(cfg)
     ctx = ToolContext(cfg=cfg, pool=pool, memory=memory)
@@ -53,7 +53,7 @@ def main() -> None:
 
     configure_logging(settings.log_level)
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
-        logger.error("SENTINELOPS_TELEGRAM_BOT_TOKEN and SENTINELOPS_TELEGRAM_CHAT_ID are required")
+        logger.error("MINUS20_TELEGRAM_BOT_TOKEN and MINUS20_TELEGRAM_CHAT_ID are required")
         sys.exit(2)
 
     async def _run() -> None:

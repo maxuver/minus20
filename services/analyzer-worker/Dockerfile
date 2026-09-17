@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-RUN useradd --no-create-home --uid 10001 sentinel
+RUN useradd --no-create-home --uid 10001 minus20
 USER 10001
 
 CMD ["python", "-m", "app.worker"]

@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-ingest-api
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: ingest-api
 spec:
   replicas: 1
@@ -48,7 +48,7 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-ingest-api
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 spec:
   selector:
     app.kubernetes.io/component: ingest-api

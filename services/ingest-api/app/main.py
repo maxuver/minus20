@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SentinelOps ingest-api",
+    title="Minus20 ingest-api",
     description="Receives Alertmanager webhooks and enqueues alerts for analysis.",
     lifespan=lifespan,
 )

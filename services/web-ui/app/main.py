@@ -1,7 +1,7 @@
 """Read-only web view of the incident history.
 
 Deliberately small: one page, no authentication, no write path. It exists so an
-engineer can see what SentinelOps concluded and why, without digging through
+engineer can see what Minus20 concluded and why, without digging through
 chat history.
 
 SECURITY: there is no authentication in this iteration. Do not expose this
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SentinelOps incident history",
+    title="Minus20 incident history",
     description="Read-only view of analysed incidents.",
     lifespan=lifespan,
 )

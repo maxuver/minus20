@@ -91,8 +91,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/sentinelops
-      - run: helm template so deploy/sentinelops > /dev/null
+      - run: helm lint deploy/minus20
+      - run: helm template m20 deploy/minus20 > /dev/null
 
   security:
     runs-on: ubuntu-latest
@@ -156,7 +156,7 @@ jobs:
       # Signed SLSA build provenance: cryptographic proof that this exact
       # image digest was built by this workflow from this commit. Anyone can
       # check it before running the image:
-      #   gh attestation verify oci://ghcr.io/maxuver/sentinelops/analyzer-worker:latest --owner maxuver
+      #   gh attestation verify oci://ghcr.io/maxuver/minus20/analyzer-worker:latest --owner maxuver
       - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/${{ github.repository }}/${{ matrix.service }}
@@ -172,7 +172,7 @@ jobs:
           output-file: sbom-${{ matrix.service }}.spdx.json
 
   # Publish the chart itself as an OCI artifact, so a user can
-  #   helm install so oci://ghcr.io/maxuver/charts/sentinelops
+  #   helm install m20 oci://ghcr.io/maxuver/charts/minus20
   # with no git clone. Runs after the images so the chart never references an
   # image tag that does not exist yet.
   publish-chart:
@@ -186,5 +186,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
       - run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-      - run: helm package deploy/sentinelops --destination /tmp/chart
-      - run: helm push /tmp/chart/sentinelops-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+      - run: helm package deploy/minus20 --destination /tmp/chart
+      - run: helm push /tmp/chart/minus20-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

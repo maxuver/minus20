@@ -2,7 +2,7 @@
   "_comment": "Populated by the Stitch Build Loop. projectId is empty until the first run: connect the Stitch MCP server, call create_project, then get_project, and write the real values here. Do not hand-edit the screens map afterwards - the loop rewrites it after every generated screen.",
   "name": "",
   "projectId": "",
-  "title": "SentinelOps Landing",
+  "title": "Minus20 Landing",
   "visibility": "PRIVATE",
   "createTime": "",
   "updateTime": "",

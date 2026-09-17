@@ -1,5 +1,10 @@
 # Real runs on AWS EKS
 
+> Recorded under the project's previous name, SentinelOps (renamed Minus20 on
+> 2026-09-17). Commands, resource names and outputs below are verbatim as run;
+> the chart is now `oci://ghcr.io/maxuver/charts/minus20` and the environment
+> prefix is `MINUS20_`.
+
 ## Run 1 — 2026-09-13: infrastructure and the reflex path
 
 **2026-09-13, eu-central-1.** The Terraform in `infra/terraform` was applied to

@@ -1,5 +1,5 @@
-{{- define "sentinelops.labels" -}}
-app.kubernetes.io/part-of: sentinelops
+{{- define "minus20.labels" -}}
+app.kubernetes.io/part-of: minus20
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- end -}}
@@ -11,7 +11,7 @@ file), and `quote` then prints 1.94698214e+08. Telegram happens to accept
 that for sending, but the agent's allow-list compares strings and silently
 ignored its own owner. Accepts a number, a float, or a comma-separated string.
 */}}
-{{- define "sentinelops.chatId" -}}
+{{- define "minus20.chatId" -}}
 {{- $v := . -}}
 {{- if kindIs "string" $v -}}
 {{- $v -}}

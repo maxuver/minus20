@@ -7,7 +7,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-agent
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent
 spec:
   replicas: 1 # Telegram long polling allows exactly one consumer per bot token
@@ -35,42 +35,42 @@ spec:
             - configMapRef:
                 name: {{ .Release.Name }}-config
           env:
-            - name: SENTINELOPS_TELEGRAM_CHAT_ID
-              value: {{ include "sentinelops.chatId" (.Values.agent.telegramChatId | default .Values.config.telegramChatId) | quote }}
-            - name: SENTINELOPS_TELEGRAM_BOT_TOKEN
+            - name: MINUS20_TELEGRAM_CHAT_ID
+              value: {{ include "minus20.chatId" (.Values.agent.telegramChatId | default .Values.config.telegramChatId) | quote }}
+            - name: MINUS20_TELEGRAM_BOT_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-telegram
                   key: bot-token
-            - name: SENTINELOPS_AGENT_MAX_TOOL_CALLS
+            - name: MINUS20_AGENT_MAX_TOOL_CALLS
               value: {{ .Values.agent.maxToolCalls | quote }}
-            - name: SENTINELOPS_AGENT_TIMEOUT_SECONDS
+            - name: MINUS20_AGENT_TIMEOUT_SECONDS
               value: {{ .Values.agent.timeoutSeconds | quote }}
-            - name: SENTINELOPS_AGENT_DAILY_BUDGET_USD
+            - name: MINUS20_AGENT_DAILY_BUDGET_USD
               value: {{ .Values.agent.dailyBudgetUsd | quote }}
-            - name: SENTINELOPS_EMBED_MODEL
+            - name: MINUS20_EMBED_MODEL
               value: {{ .Values.agent.embedModel | quote }}
-            - name: SENTINELOPS_EMBED_DIM
+            - name: MINUS20_EMBED_DIM
               value: {{ .Values.agent.embedDim | quote }}
-            - name: SENTINELOPS_VISION_MODEL
+            - name: MINUS20_VISION_MODEL
               value: {{ .Values.agent.visionModel | quote }}
-            - name: SENTINELOPS_OPENAI_VISION_MODEL
+            - name: MINUS20_OPENAI_VISION_MODEL
               value: {{ .Values.agent.openaiVisionModel | quote }}
-            - name: SENTINELOPS_VISION_PROVIDER
+            - name: MINUS20_VISION_PROVIDER
               value: {{ .Values.agent.visionProvider | quote }}
             {{- if .Values.agent.runbooks }}
-            - name: SENTINELOPS_RUNBOOKS_DIR
+            - name: MINUS20_RUNBOOKS_DIR
               value: /runbooks
             {{- end }}
             {{- if eq .Values.config.store "postgres" }}
-            - name: SENTINELOPS_POSTGRES_DSN
+            - name: MINUS20_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-postgres-dsn
                   key: dsn
             {{- end }}
             {{- if or (eq .Values.config.llmProvider "openai") (eq .Values.config.llmFallbackProvider "openai") }}
-            - name: SENTINELOPS_OPENAI_API_KEY
+            - name: MINUS20_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-llm
@@ -98,7 +98,7 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-runbooks
   labels:
-    {{- include "sentinelops.labels" . | nindent 4 }}
+    {{- include "minus20.labels" . | nindent 4 }}
 data:
   {{- range $name, $content := .Values.agent.runbooks }}
   {{ $name }}: |

@@ -1,4 +1,4 @@
-# SentinelOps on AWS EKS (Terraform)
+# Minus20 on AWS EKS (Terraform)
 
 Production-shaped infrastructure as code for an **ephemeral** EKS cluster:
 a VPC (three AZs, single NAT gateway for cost) plus an EKS cluster with a managed
@@ -15,7 +15,7 @@ The EBS CSI add-on (`addons.tf`) was applied on the second run, 2026-09-14,
 and Postgres bound a real EBS volume; note that EKS's `gp2` StorageClass is
 not marked default, so the chart needs `--set postgres.storageClass=gp2`. Applying is intentionally ephemeral: apply, deploy the
 Helm chart, demo, then `destroy`, to keep the bill to cents. The same
-[`deploy/sentinelops`](../../deploy/sentinelops) Helm chart runs unchanged on
+[`deploy/minus20`](../../deploy/minus20) Helm chart runs unchanged on
 this cluster and on local kind, so nothing about the application layer is
 AWS-specific.
 
@@ -31,15 +31,15 @@ terraform validate
 
 ```bash
 # once per account: the S3 bucket that holds the state (versioned, encrypted, private)
-terraform -chdir=bootstrap init && terraform -chdir=bootstrap apply -var aws_profile=sentinelops
+terraform -chdir=bootstrap init && terraform -chdir=bootstrap apply -var aws_profile=minus20
 terraform -chdir=bootstrap output -raw backend_hcl > backend.hcl   # gitignored
 
 terraform init -backend-config=backend.hcl
-terraform plan  -var aws_profile=sentinelops -var budget_alert_email=you@example.com
-terraform apply -var aws_profile=sentinelops -var budget_alert_email=you@example.com
+terraform plan  -var aws_profile=minus20 -var budget_alert_email=you@example.com
+terraform apply -var aws_profile=minus20 -var budget_alert_email=you@example.com
 
-aws eks update-kubeconfig --region eu-central-1 --name sentinelops
-helm upgrade --install so ../../deploy/sentinelops -n sentinelops --create-namespace
+aws eks update-kubeconfig --region eu-central-1 --name minus20
+helm upgrade --install m20 ../../deploy/minus20 -n minus20 --create-namespace
 
 # ... demo ...
 
@@ -95,10 +95,10 @@ attribute in clear text, which is why it is never local and never committed.
 
 ## Credentials and IAM (what this run used, and what it should use)
 
-The first real run used an IAM user (`sentinelops-terraform`) with
+The first real run used an IAM user (`sentinelops-terraform`, created before the rename) with
 `AdministratorAccess` and a long-lived access key, configured as a named
-profile (`aws configure --profile sentinelops`, passed as `-var
-aws_profile=sentinelops`; the provider never sees a key). Stated plainly
+profile (`aws configure --profile minus20`, passed as `-var
+aws_profile=minus20`; the provider never sees a key). Stated plainly
 because it is the wrong long-term shape:
 
 - **Prefer short-lived credentials.** AWS CLI v2's `aws login` (browser sign-in

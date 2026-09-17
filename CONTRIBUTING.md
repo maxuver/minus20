@@ -10,7 +10,7 @@ Run what CI runs:
 cd services/analyzer-worker && ruff check app tests && pytest -q
 cd ../ingest-api && ruff check app tests && pytest -q
 cd ../web-ui && ruff check app tests && pytest -q
-helm lint deploy/sentinelops
+helm lint deploy/minus20
 ```
 
 ## Every change that alters behaviour updates the docs in the same commit

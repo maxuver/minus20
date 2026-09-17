@@ -25,7 +25,7 @@ what; AI is an overlay, not a point of failure.
 
 ## Consequences
 
-- The pipeline is strictly additive to existing alerting: switching SentinelOps off
+- The pipeline is strictly additive to existing alerting: switching Minus20 off
   returns the team to exactly what they had before.
 - Alert delivery latency is decoupled from LLM latency and measurable separately.
 - Requires two Telegram messages per incident (raw + analysis) — accepted, it also

@@ -1,4 +1,4 @@
-# SentinelOps — Design System
+# Minus20 — Design System
 
 Audience: platform engineers, SRE leads, CTOs. They distrust marketing polish and
 trust evidence. The page must feel like a well-built tool, not a campaign.

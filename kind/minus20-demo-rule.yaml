@@ -4,13 +4,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: sentinelops-demo
+  name: minus20-demo
   namespace: monitoring
   labels:
     release: kps
 spec:
   groups:
-    - name: sentinelops-demo
+    - name: minus20-demo
       rules:
         - alert: KubePodCrashLoopingFast
           expr: increase(kube_pod_container_status_restarts_total[3m]) > 1

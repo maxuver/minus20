@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+data:
+  MINUS20_REDIS_URL: redis://{{ .Release.Name }}-redis:6379/0
+  MINUS20_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  MINUS20_LLM_PROVIDER: {{ .Values.config.llmProvider | quote }}
+  MINUS20_LLM_FALLBACK_PROVIDER: {{ .Values.config.llmFallbackProvider | quote }}
+  MINUS20_OLLAMA_URL: {{ .Values.config.ollamaUrl | quote }}
+  MINUS20_OLLAMA_MODEL: {{ .Values.config.ollamaModel | quote }}
+  MINUS20_LLM_TIMEOUT_SECONDS: {{ .Values.config.llmTimeoutSeconds | quote }}
+  MINUS20_STORM_WINDOW_SECONDS: {{ .Values.config.stormWindowSeconds | quote }}
+  MINUS20_OPENAI_BASE_URL: {{ .Values.config.openaiBaseUrl | quote }}
+  MINUS20_OPENAI_MODEL: {{ .Values.config.openaiModel | quote }}
+  MINUS20_OPENAI_PRICE_IN_PER_MTOK: {{ .Values.config.openaiPriceInPerMtok | quote }}
+  MINUS20_OPENAI_PRICE_OUT_PER_MTOK: {{ .Values.config.openaiPriceOutPerMtok | quote }}
+  MINUS20_COLLECTORS: {{ .Values.config.collectors | quote }}
+  MINUS20_NOTIFIER: {{ .Values.config.notifier | quote }}
+  MINUS20_PROMETHEUS_URL: {{ .Values.config.prometheusUrl | quote }}
+  MINUS20_LOKI_URL: {{ .Values.config.lokiUrl | quote }}
+  MINUS20_CLOUDWATCH_LOG_GROUP: {{ .Values.config.cloudwatchLogGroup | quote }}
+  MINUS20_CLOUDWATCH_CLUSTER_NAME: {{ .Values.config.cloudwatchClusterName | quote }}
+  MINUS20_AWS_REGION: {{ .Values.config.awsRegion | quote }}
+  MINUS20_TELEGRAM_CHAT_ID: {{ include "minus20.chatId" .Values.config.telegramChatId | quote }}
+  MINUS20_STORE: {{ .Values.config.store | quote }}

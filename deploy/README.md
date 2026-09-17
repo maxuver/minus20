@@ -1,6 +1,6 @@
-# Deploying SentinelOps to Kubernetes
+# Deploying Minus20 to Kubernetes
 
-Helm chart: [`sentinelops/`](sentinelops). The defaults run **fully offline** on a
+Helm chart: [`minus20/`](minus20). The defaults run **fully offline** on a
 local kind cluster: the stub LLM backend (no API key), the Kubernetes-events
 collector, and a read-only RBAC ServiceAccount.
 
@@ -8,30 +8,30 @@ collector, and a read-only RBAC ServiceAccount.
 
 ```bash
 # 1. build the service images
-docker build services/ingest-api      -t sentinelops/ingest-api:dev
-docker build services/analyzer-worker -t sentinelops/analyzer-worker:dev
+docker build services/ingest-api      -t minus20/ingest-api:dev
+docker build services/analyzer-worker -t minus20/analyzer-worker:dev
 
 # 2. side-load them into the kind nodes
-kind load docker-image sentinelops/ingest-api:dev      --name sentinelops
-kind load docker-image sentinelops/analyzer-worker:dev --name sentinelops
+kind load docker-image minus20/ingest-api:dev      --name minus20
+kind load docker-image minus20/analyzer-worker:dev --name minus20
 
 # 3. install
-helm upgrade --install so deploy/sentinelops -n sentinelops --create-namespace
-kubectl -n sentinelops rollout status deploy/so-analyzer-worker
+helm upgrade --install m20 deploy/minus20 -n minus20 --create-namespace
+kubectl -n minus20 rollout status deploy/m20-analyzer-worker
 ```
 
 ## Smoke test (end to end)
 
 ```bash
 # a failing pod produces real Warning events for the collector to read
-kubectl -n sentinelops run billing-api --image=nginx:tag-does-not-exist
+kubectl -n minus20 run billing-api --image=nginx:tag-does-not-exist
 
 # fire an Alertmanager webhook at ingest-api and watch the worker
-kubectl -n sentinelops run alert-sender --image=curlimages/curl --restart=Never --rm -i --command -- \
-  curl -s -X POST http://so-ingest-api:8080/webhook/alertmanager -H 'content-type: application/json' \
-  -d '{"version":"4","status":"firing","alerts":[{"status":"firing","labels":{"alertname":"KubePodCrashLooping","namespace":"sentinelops","pod":"billing-api","severity":"warning"},"annotations":{"description":"crash looping"},"fingerprint":"deadbeef01"}]}'
+kubectl -n minus20 run alert-sender --image=curlimages/curl --restart=Never --rm -i --command -- \
+  curl -s -X POST http://m20-ingest-api:8080/webhook/alertmanager -H 'content-type: application/json' \
+  -d '{"version":"4","status":"firing","alerts":[{"status":"firing","labels":{"alertname":"KubePodCrashLooping","namespace":"minus20","pod":"billing-api","severity":"warning"},"annotations":{"description":"crash looping"},"fingerprint":"deadbeef01"}]}'
 
-kubectl -n sentinelops logs deploy/so-analyzer-worker | tail
+kubectl -n minus20 logs deploy/m20-analyzer-worker | tail
 # -> incident alert=KubePodCrashLooping status=analyzed backend=stub ...
 ```
 
@@ -42,9 +42,9 @@ that this exact digest was built by this repository's public workflow from a
 specific commit, not on someone's laptop. Verify before the first install:
 
 ```bash
-gh attestation verify oci://ghcr.io/maxuver/sentinelops/analyzer-worker:latest --owner maxuver
-gh attestation verify oci://ghcr.io/maxuver/sentinelops/ingest-api:latest --owner maxuver
-gh attestation verify oci://ghcr.io/maxuver/sentinelops/web-ui:latest --owner maxuver
+gh attestation verify oci://ghcr.io/maxuver/minus20/analyzer-worker:latest --owner maxuver
+gh attestation verify oci://ghcr.io/maxuver/minus20/ingest-api:latest --owner maxuver
+gh attestation verify oci://ghcr.io/maxuver/minus20/web-ui:latest --owner maxuver
 ```
 
 Each CI run also publishes an SBOM (SPDX) per image as a workflow artifact,
@@ -59,7 +59,7 @@ pods and their logs, ReplicaSets and Deployments. No write verb anywhere, no
 exec, no secrets:
 
 ```bash
-sa=system:serviceaccount:sentinelops:so-analyzer
+sa=system:serviceaccount:minus20:m20-analyzer
 kubectl auth can-i list events    --as=$sa -A   # yes
 kubectl auth can-i get pods/log   --as=$sa -A   # yes (the agent reads crash output)
 kubectl auth can-i list secrets   --as=$sa -A   # no
@@ -86,11 +86,11 @@ helm upgrade --install loki grafana/loki-stack -n monitoring \
   --set promtail.enabled=true
 
 # switch the analyzer to all three collectors, wired to the in-cluster services
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.collectors='k8s-events\,prometheus\,loki' \
   --set config.prometheusUrl=http://kps-kube-prometheus-stack-prometheus.monitoring:9090 \
   --set config.lokiUrl=http://loki.monitoring:3100
-kubectl -n sentinelops rollout restart deploy/so-analyzer-worker
+kubectl -n minus20 rollout restart deploy/m20-analyzer-worker
 ```
 
 Validated on kind: a crash-looping pod produced real BackOff events, real
@@ -100,19 +100,19 @@ collectors and fed to the analyzer.
 
 ## Autonomous loop (Alertmanager fires the pipeline)
 
-With the monitoring stack installed, SentinelOps runs with no manual step. A
+With the monitoring stack installed, Minus20 runs with no manual step. A
 Prometheus rule fires on a crash-looping pod, Alertmanager routes it to the
 ingest-api webhook (routing is in `kind/values-monitoring.yaml`), and the
 analyzer produces an incident.
 
 ```bash
-kubectl apply -f kind/sentinelops-demo-rule.yaml       # fast crash-loop alert
-kubectl -n sentinelops run billing-api --image=busybox --command -- \
+kubectl apply -f kind/minus20-demo-rule.yaml       # fast crash-loop alert
+kubectl -n minus20 run billing-api --image=busybox --command -- \
   sh -c "echo boom; sleep 2; exit 1"
 
 # ~90s later, with no manual curl:
-kubectl -n sentinelops logs deploy/so-ingest-api      | grep queued
-kubectl -n sentinelops logs deploy/so-analyzer-worker | grep 'incident alert'
+kubectl -n minus20 logs deploy/m20-ingest-api      | grep queued
+kubectl -n minus20 logs deploy/m20-analyzer-worker | grep 'incident alert'
 ```
 
 Validated on kind: pod restarts -> KubePodCrashLoopingFast fires -> Alertmanager
@@ -128,20 +128,20 @@ disprove it, blast radius and next steps.
 No OAuth app to install, no scopes for a security team to review.
 
 ```bash
-kubectl -n sentinelops create secret generic so-slack \
+kubectl -n minus20 create secret generic m20-slack \
   --from-literal=webhook-url='https://hooks.slack.com/services/T.../B.../...'
 
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.notifier=slack
 ```
 
 **Telegram** needs a bot token from @BotFather and the target chat id:
 
 ```bash
-kubectl -n sentinelops create secret generic so-telegram \
+kubectl -n minus20 create secret generic m20-telegram \
   --from-literal=bot-token='123456:ABC...'
 
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.notifier=telegram --set config.telegramChatId=123456789
 ```
 
@@ -153,12 +153,12 @@ webhook URL *is* the credential — anyone holding it can post to the channel.
 Container Insights ships pod logs to CloudWatch Logs and pod metrics to the
 `ContainerInsights` namespace. Two collectors read them, read-only, with the
 pod's own AWS identity (EKS Pod Identity on the chart's ServiceAccount;
-`infra/terraform/sentinelops-identity.tf` creates the role and the
+`infra/terraform/minus20-identity.tf` creates the role and the
 association, policy: `logs:StartQuery`, `logs:GetQueryResults`,
 `cloudwatch:GetMetricData`):
 
 ```bash
-helm upgrade --install so oci://ghcr.io/maxuver/charts/sentinelops -n sentinelops \
+helm upgrade --install m20 oci://ghcr.io/maxuver/charts/minus20 -n minus20 \
   --set config.collectors='k8s-events\,k8s-logs\,cloudwatch-logs\,cloudwatch-metrics' \
   --set config.cloudwatchLogGroup=/aws/containerinsights/<cluster>/application \
   --set config.cloudwatchClusterName=<cluster>
@@ -191,7 +191,7 @@ from inside the cluster. On kind or Docker Desktop, the host's Ollama is
 at it.
 
 ```bash
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.llmProvider=ollama \
   --set config.ollamaUrl=http://host.docker.internal:11434 \
   --set config.ollamaModel=qwen2.5:7b \
@@ -202,9 +202,9 @@ helm upgrade --install so deploy/sentinelops -n sentinelops \
 OpenRouter, vLLM or LM Studio by changing `openaiBaseUrl`):
 
 ```bash
-kubectl -n sentinelops create secret generic so-llm \
+kubectl -n minus20 create secret generic m20-llm \
   --from-literal=openai-api-key=sk-...
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.llmProvider=openai \
   --set config.collectors=k8s-events\,prometheus\,loki
 ```
@@ -215,8 +215,8 @@ start with `AIza`), store it under the same `openai-api-key` name (the name
 means "the OpenAI *dialect*", not the company), and name a current model:
 
 ```bash
-kubectl -n sentinelops create secret generic so-llm --from-literal=openai-api-key='...'
-helm upgrade --install so deploy/sentinelops -n sentinelops   --set config.llmProvider=openai   --set config.openaiBaseUrl=https://generativelanguage.googleapis.com/v1beta/openai/   --set config.openaiModel=gemini-3.6-flash   --set config.openaiPriceInPerMtok=0 --set config.openaiPriceOutPerMtok=0
+kubectl -n minus20 create secret generic m20-llm --from-literal=openai-api-key='...'
+helm upgrade --install m20 deploy/minus20 -n minus20   --set config.llmProvider=openai   --set config.openaiBaseUrl=https://generativelanguage.googleapis.com/v1beta/openai/   --set config.openaiModel=gemini-3.6-flash   --set config.openaiPriceInPerMtok=0 --set config.openaiPriceOutPerMtok=0
 ```
 
 Measured 2026-09-13: hard benchmark 5/5 in 7.6 s average (`docs/BENCHMARKS.md`).
@@ -229,7 +229,7 @@ timeout). The incident records which one answered. Screenshots are read by
 `agent.visionProvider` (local by default) regardless of the chat provider.
 
 ```bash
-helm upgrade --install so deploy/sentinelops -n sentinelops   --set config.llmProvider=openai --set config.llmFallbackProvider=ollama   --set config.ollamaUrl=http://host.docker.internal:11434
+helm upgrade --install m20 deploy/minus20 -n minus20   --set config.llmProvider=openai --set config.llmFallbackProvider=ollama   --set config.ollamaUrl=http://host.docker.internal:11434
 ```
 
 Measured 2026-09-14, Gemini's free tier out of quota: primary failed with
@@ -239,9 +239,9 @@ the hypothesis.
 **Anthropic:**
 
 ```bash
-kubectl -n sentinelops create secret generic so-llm \
+kubectl -n minus20 create secret generic m20-llm \
   --from-literal=anthropic-api-key=sk-ant-...
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.llmProvider=anthropic \
   --set config.collectors=k8s-events\,prometheus\,loki
 ```
@@ -260,7 +260,7 @@ Postgres image) and a local embedding model:
 ```bash
 ollama pull nomic-embed-text
 
-helm upgrade --install so deploy/sentinelops -n sentinelops \
+helm upgrade --install m20 deploy/minus20 -n minus20 \
   --set config.store=postgres \
   --set config.llmProvider=ollama --set config.ollamaUrl=http://host.docker.internal:11434 \
   --set agent.enabled=true --set agent.telegramChatId=123456789
@@ -305,7 +305,7 @@ filename → markdown.
 ## Use it from your own agent (MCP)
 
 The seven read-only tools are also served over the Model Context Protocol, so
-an agent you already use can ask SentinelOps what happened in this cluster
+an agent you already use can ask Minus20 what happened in this cluster
 before. Nothing new is exposed and nothing can be changed: it is the agent's
 closed registry, annotated read-only, behind the same redaction.
 
@@ -313,9 +313,9 @@ closed registry, annotated read-only, behind the same redaction.
 you want history and memory):
 
 ```bash
-kubectl -n sentinelops port-forward svc/so-postgres 5432:5432 &
+kubectl -n minus20 port-forward svc/m20-postgres 5432:5432 &
 cd services/analyzer-worker && pip install -r requirements.txt
-SENTINELOPS_STORE=postgres SENTINELOPS_POSTGRES_DSN=postgresql://sentinel:sentinel@localhost:5432/sentinelops \
+MINUS20_STORE=postgres MINUS20_POSTGRES_DSN=postgresql://minus20:minus20@localhost:5432/minus20 \
   python -m app.mcp_server
 ```
 
@@ -324,13 +324,13 @@ Gemini CLI, `~/.gemini/settings.json`:
 ```json
 {
   "mcpServers": {
-    "sentinelops": {
+    "minus20": {
       "command": "python",
       "args": ["-m", "app.mcp_server"],
-      "cwd": "/path/to/sentinelops/services/analyzer-worker",
+      "cwd": "/path/to/minus20/services/analyzer-worker",
       "env": {
-        "SENTINELOPS_STORE": "postgres",
-        "SENTINELOPS_POSTGRES_DSN": "postgresql://sentinel:sentinel@localhost:5432/sentinelops"
+        "MINUS20_STORE": "postgres",
+        "MINUS20_POSTGRES_DSN": "postgresql://minus20:minus20@localhost:5432/minus20"
       }
     }
   }
@@ -340,8 +340,8 @@ Gemini CLI, `~/.gemini/settings.json`:
 Claude Code:
 
 ```bash
-claude mcp add sentinelops -e SENTINELOPS_STORE=postgres \
-  -e SENTINELOPS_POSTGRES_DSN=postgresql://sentinel:sentinel@localhost:5432/sentinelops \
+claude mcp add minus20 -e MINUS20_STORE=postgres \
+  -e MINUS20_POSTGRES_DSN=postgresql://minus20:minus20@localhost:5432/minus20 \
   -- python -m app.mcp_server
 ```
 
@@ -349,5 +349,5 @@ Then ask your agent: *"has billing-api crashed before, and what was the real
 cause?"* and it will call `search_memory`.
 
 **In the cluster, over HTTP**: `--set mcp.enabled=true` adds a ClusterIP
-Service `so-mcp` on port 8765 (`kubectl port-forward svc/so-mcp 8765`), and
+Service `m20-mcp` on port 8765 (`kubectl port-forward svc/m20-mcp 8765`), and
 clients that speak streamable HTTP connect to `http://localhost:8765/mcp`.

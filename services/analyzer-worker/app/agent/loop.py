@@ -21,10 +21,10 @@ from ..ports import BackendError, Budget
 from . import tools
 from .chat import ChatBackend, assistant_message, salvage_tool_calls, tool_message
 
-logger = logging.getLogger("sentinelops.agent.loop")
+logger = logging.getLogger("minus20.agent.loop")
 
 SYSTEM_PROMPT = (
-    "You are SentinelOps, an SRE assistant for one Kubernetes cluster. An engineer "
+    "You are Minus20, an SRE assistant for one Kubernetes cluster. An engineer "
     "asks you questions in chat; you answer using the tools you are given and "
     "nothing else.\n\n"
     "You only observe. You have no tool that can change the cluster, and you never "

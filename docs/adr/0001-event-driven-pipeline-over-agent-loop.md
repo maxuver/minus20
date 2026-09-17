@@ -13,7 +13,7 @@ Two dominant patterns exist for AI-assisted Kubernetes diagnostics:
    iterates, refines. Powerful, but the number of LLM round-trips — and therefore
    cost and latency — is unbounded and varies per incident.
 
-SentinelOps reacts to production alerts on a budget measured in cents, and its output
+Minus20 reacts to production alerts on a budget measured in cents, and its output
 must be explainable to an on-call engineer who has to trust it at 3 AM.
 
 ## Decision

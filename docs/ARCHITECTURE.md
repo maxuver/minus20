@@ -16,7 +16,7 @@ Alertmanager ──► ingest-api ──► Redis Stream ──► analyzer-work
                                                        ├─► Slack / Telegram (hypothesis)       │
                                                        └─► web-ui (read-only history)          │
                                                                                                │
-Engineer in Telegram ──► sentinel-agent                                          DELIBERATE    │
+Engineer in Telegram ──► minus20-agent                                          DELIBERATE    │
    "why did billing-api crash?"     bounded tool loop, on demand ──────────────────────────────┘
    "what changed in the last hour?"    tools: closed, read-only (events, logs, metrics,
    "/report 7"                                rollouts, incident history, memory)
@@ -36,7 +36,7 @@ Both run from the same container image with different entrypoints
 (`python -m app.worker`, `python -m app.agent`) and share one read-only
 ServiceAccount. A third entrypoint, `python -m app.mcp_server`, serves the
 agent's tool registry over the Model Context Protocol so an external agent
-(Gemini CLI, Claude Code) can use SentinelOps as its memory of the cluster;
+(Gemini CLI, Claude Code) can use Minus20 as its memory of the cluster;
 it adds no tool and no permission.
 
 ## Ports and adapters
@@ -47,14 +47,14 @@ vendor is never a code change (ADR-0002).
 
 | Port | Adapters | Selected by |
 |---|---|---|
-| `Collector` | `K8sEventsCollector`, `K8sPodLogsCollector`, `PrometheusCollector`, `LokiCollector`, `CloudWatchLogsCollector`, `CloudWatchMetricsCollector`, `StubCollector`, fanned out by `AggregateCollector` | `SENTINELOPS_COLLECTORS` |
-| `LLMBackend` | `OllamaBackend` (local, $0), `OpenAICompatibleBackend` (DeepSeek, Groq, Gemini, vLLM…), `AnthropicBackend`, `StubBackend`; `FallbackBackend` tiers any two | `SENTINELOPS_LLM_PROVIDER`, `_LLM_FALLBACK_PROVIDER` |
-| `Notifier` | `SlackNotifier` (Incoming Webhook), `TelegramNotifier`, `StubNotifier` | `SENTINELOPS_NOTIFIER` |
-| `IncidentStore` | `PostgresStore`, `InMemoryStore` | `SENTINELOPS_STORE` |
+| `Collector` | `K8sEventsCollector`, `K8sPodLogsCollector`, `PrometheusCollector`, `LokiCollector`, `CloudWatchLogsCollector`, `CloudWatchMetricsCollector`, `StubCollector`, fanned out by `AggregateCollector` | `MINUS20_COLLECTORS` |
+| `LLMBackend` | `OllamaBackend` (local, $0), `OpenAICompatibleBackend` (DeepSeek, Groq, Gemini, vLLM…), `AnthropicBackend`, `StubBackend`; `FallbackBackend` tiers any two | `MINUS20_LLM_PROVIDER`, `_LLM_FALLBACK_PROVIDER` |
+| `Notifier` | `SlackNotifier` (Incoming Webhook), `TelegramNotifier`, `StubNotifier` | `MINUS20_NOTIFIER` |
+| `IncidentStore` | `PostgresStore`, `InMemoryStore` | `MINUS20_STORE` |
 | `Budget` | `RedisBudget` (shared across replicas), `InMemoryBudget` | Redis present or not |
 | `Deduplicator` | `RedisDeduplicator` (`SET NX EX`), `InMemoryDeduplicator` | Redis present or not |
-| `ChatBackend` (agent) | `OllamaChat`, `OpenAIChat`, `FallbackChat`; vision routed separately | `SENTINELOPS_LLM_PROVIDER`, `_VISION_PROVIDER` |
-| `Embedder` (agent) | `OllamaEmbedder` | `SENTINELOPS_EMBED_MODEL` |
+| `ChatBackend` (agent) | `OllamaChat`, `OpenAIChat`, `FallbackChat`; vision routed separately | `MINUS20_LLM_PROVIDER`, `_VISION_PROVIDER` |
+| `Embedder` (agent) | `OllamaEmbedder` | `MINUS20_EMBED_MODEL` |
 
 Tests inject fakes at the same ports (`httpx.MockTransport`, fake pools, fake
 Kubernetes clients), which is why the whole suite runs offline in about a
@@ -105,8 +105,8 @@ log line can produce a wrong sentence in chat; it cannot produce an action.
 
 ## Deployment shape
 
-Helm chart `deploy/sentinelops` (published as OCI at
-`ghcr.io/maxuver/charts/sentinelops`): ingest-api, analyzer-worker, Redis,
+Helm chart `deploy/minus20` (published as OCI at
+`ghcr.io/maxuver/charts/minus20`): ingest-api, analyzer-worker, Redis,
 optional Postgres (pgvector image), optional web-ui, optional agent. Images
 come from GHCR on every push to `main`, gated on tests, SAST, SCA and secret
 scanning. `infra/terraform` stands up an ephemeral EKS for the same chart.

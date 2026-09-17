@@ -1,4 +1,4 @@
-"""sentinel-agent: the deliberate, on-demand half of ADR-0005.
+"""minus20-agent: the deliberate, on-demand half of ADR-0005.
 
 The analyzer-worker is the reflex: one bounded LLM call per alert. This
 package is the agent an engineer talks to in chat when the reflex's answer is

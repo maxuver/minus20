@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from .config import Settings, settings
 from .models import StreamAlert
 
-_PREFIX = "sentinelops:storm"
+_PREFIX = "minus20:storm"
 NOTIFY_AT = (2, 5, 10, 25, 50, 100, 250, 500)
 MAX_PODS_KEPT = 20
 

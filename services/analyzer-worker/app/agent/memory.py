@@ -25,7 +25,7 @@ from ..config import Settings, settings
 from ..redaction import redact
 from ..stores import ensure_incidents_schema
 
-logger = logging.getLogger("sentinelops.agent.memory")
+logger = logging.getLogger("minus20.agent.memory")
 
 _VECTOR_SCHEMA = (
     "CREATE EXTENSION IF NOT EXISTS vector",

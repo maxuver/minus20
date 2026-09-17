@@ -1,7 +1,7 @@
 """LLM backends behind one interface (ADR-0002).
 
 Each backend turns a prompt into an LLMResult. Selecting one is configuration
-(`SENTINELOPS_LLM_PROVIDER`), never code:
+(`MINUS20_LLM_PROVIDER`), never code:
 
 - stub      — deterministic, offline, $0. Used in tests and for replay/demo.
 - anthropic — cloud, best quality, via the official `anthropic` async SDK.
@@ -204,7 +204,7 @@ class OpenAICompatibleBackend:
     DeepSeek, Groq, Together, OpenRouter, vLLM and LM Studio all expose
     `POST {base_url}/chat/completions` with the same request and response
     shape, so one adapter covers them all. The API key is read from
-    SENTINELOPS_OPENAI_API_KEY and only ever sent as a bearer header; local
+    MINUS20_OPENAI_API_KEY and only ever sent as a bearer header; local
     servers (vLLM, LM Studio) accept an empty key.
     """
 
@@ -300,7 +300,7 @@ def _single_backend(provider: str, cfg: Settings):
         return OpenAICompatibleBackend(cfg)
     if provider == "stub":
         return StubBackend()
-    raise ValueError(f"unknown SENTINELOPS_LLM_PROVIDER: {provider!r}")
+    raise ValueError(f"unknown MINUS20_LLM_PROVIDER: {provider!r}")
 
 
 def get_backend(cfg: Settings = settings):

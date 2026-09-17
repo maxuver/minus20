@@ -1,4 +1,4 @@
-# SentinelOps — Vision
+# Minus20 — Vision
 
 > Written 2026-07-28, before a line of code. Kept as the statement of intent.
 > What exists today, and how it is built, is in [ARCHITECTURE.md](ARCHITECTURE.md);
@@ -14,7 +14,7 @@ pod/node status, events and recent releases. While that search is running, nobod
 tell the business what happened. Understanding arrives in 10–20 minutes; ten minutes
 later the incident is often already fixed — but for the business it looked like 30 lost
 minutes. This window is what MTTA (mean time to acknowledge/assess) measures, and it is
-the window SentinelOps attacks.
+the window Minus20 attacks.
 
 The dashboards are usually excellent. Grafana, runbooks, on-call rotation — all
 exemplary. But dashboards help *after* the incident, not *during* it: monitoring knows
@@ -27,7 +27,7 @@ Bus factor, burnout, churn.
 
 ## 2. The solution
 
-SentinelOps automates the first minutes of every incident with an event-driven pipeline:
+Minus20 automates the first minutes of every incident with an event-driven pipeline:
 
 1. **Alertmanager** fires a webhook on every alert.
 2. **ingest-api** validates it and publishes it to a Redis Stream. The raw alert is
@@ -67,7 +67,7 @@ We are not guessing at a trend; we are entering a confirmed one.
 
 ## 4. Positioning against prior art
 
-|                        | k8sgpt                  | HolmesGPT                     | AWS DevOps Agent (2026)            | SentinelOps                             |
+|                        | k8sgpt                  | HolmesGPT                     | AWS DevOps Agent (2026)            | Minus20                             |
 |------------------------|-------------------------|-------------------------------|------------------------------------|-----------------------------------------|
 | Model of operation     | on-demand cluster scan  | autonomous agent loop         | managed autonomous agent           | event-driven reflex + bounded on-demand agent |
 | Context                | K8s resources           | many toolsets                 | account topology, telemetry, code  | logs + metrics + events around the alert; memory of past incidents |
@@ -85,7 +85,7 @@ predictable cost, bounded latency, auditable behaviour
 Alert context contains **other people's data**: logs carry emails, IPs, tokens, request
 bodies. Shipping that to a third-party cloud API is a data-governance decision, not a
 technical detail — under GDPR it can make the LLM vendor a data processor.
-SentinelOps treats this as a design constraint, not an afterthought:
+Minus20 treats this as a design constraint, not an afterthought:
 
 - **Redaction before any LLM call** — emails, IP addresses, bearer/JWT tokens, cloud
   credentials and secret-shaped strings are masked in the collector output.
@@ -131,7 +131,7 @@ These numbers are the project's résumé: each one can be demonstrated live.
   review format came from a real incident report for a production API.
 - The same tools are served over **MCP** to external agent CLIs.
 - **AWS DevOps Agent** (GA April 2026) confirmed the category with the same
-  pitch ("always-on autonomous on-call engineer"). SentinelOps is positioned
+  pitch ("always-on autonomous on-call engineer"). Minus20 is positioned
   for where it cannot be used: data that must stay in the cluster, clusters not
   on AWS, teams that need the price known in advance, open code.
 - Terraform for EKS was **applied for real** once and destroyed ([EKS-RUN.md](EKS-RUN.md)).

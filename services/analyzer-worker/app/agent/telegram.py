@@ -3,7 +3,7 @@
 Raw Bot API over httpx, like the notifier, rather than a framework: the
 surface is small and it keeps the image's dependency set unchanged.
 
-Only chats listed in SENTINELOPS_TELEGRAM_CHAT_ID are served. Anyone else who
+Only chats listed in MINUS20_TELEGRAM_CHAT_ID are served. Anyone else who
 finds the bot gets silence, not cluster events: the tools are read-only, but
 read-only on someone else's cluster is still a leak.
 """
@@ -25,10 +25,10 @@ from .chat import ChatBackend
 from .loop import Agent
 from .memory import Memory
 
-logger = logging.getLogger("sentinelops.agent.telegram")
+logger = logging.getLogger("minus20.agent.telegram")
 
 HELP = (
-    "I am the SentinelOps agent for this cluster. I only observe; I cannot change anything.\n\n"
+    "I am the Minus20 agent for this cluster. I only observe; I cannot change anything.\n\n"
     "Ask me in plain words, for example:\n"
     "  why did billing-api crash?\n"
     "  what changed in payments in the last 6 hours?\n"
