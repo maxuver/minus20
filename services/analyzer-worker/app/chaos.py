@@ -130,7 +130,8 @@ class Chaos:
         return len(names)
 
     async def run(self, mode: str | None = None) -> str:
-        mode = mode or random.choice(sorted(MODES))
+        # which fault to inject, not anything security-relevant
+        mode = mode or random.choice(sorted(MODES))  # nosec B311
         removed = await self.cleanup()
         name = f"chaos-{mode}-{datetime.now(timezone.utc).strftime('%H%M')}"
         await self._api.create_namespaced_pod(self._ns, pod_manifest(mode, name, self._ns))
