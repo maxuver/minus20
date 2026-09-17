@@ -140,10 +140,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # arm64 as well as amd64: the unattended demo runs on an ARM host
+      # (Oracle Ampere, Hetzner CAX, Graviton nodes on EKS). QEMU emulation
+      # makes the arm64 build a few minutes slower; a multi-arch index is
+      # what gets attested and scanned below.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         id: build
         with:
           context: services/${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest

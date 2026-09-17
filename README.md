@@ -158,11 +158,12 @@ helm upgrade --install m20 deploy/minus20 -n minus20 \
 | `ingest-api` — Alertmanager webhook → Redis Streams | ✅ |
 | `analyzer-worker` — collectors, redaction, budget, dedup, alert-storm grouping, cross-alert correlation (three alerts at 03:00, one revised hypothesis), graceful degradation | ✅ ([ADR-0006](docs/adr/0006-cross-alert-correlation.md)) |
 | Collectors — Kubernetes events and pod logs, Prometheus, Loki, CloudWatch (Container Insights) | ✅ |
-| LLM backends — local Ollama, any OpenAI-compatible API (DeepSeek, Groq, vLLM…), Anthropic, offline stub | ✅ |
+| LLM backends — local Ollama, any OpenAI-compatible API (DeepSeek, Mistral, Gemini, Groq, vLLM…), Anthropic, offline stub; local-first with a cloud fallback tier | ✅ |
 | Delivery — Slack, Telegram | ✅ |
 | Incident history — Postgres, with the redacted context each hypothesis was based on (audit trail) | ✅ |
 | Read-only web UI for the incident history | ✅ |
-| Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report`, screenshots via a local vision model | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
+| Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report` (on demand and on a weekly schedule), screenshots via a local vision model | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
+| Unattended demo — a CronJob that breaks a pod on a schedule and pages the reflex, under its own write-capable ServiceAccount; the product stays read-only | ✅ `demo.chaos.enabled` |
 | MCP server — the same read-only tools for Gemini CLI, Claude Code, Cursor | ✅ |
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark; the eval set grows from real incidents with an engineer's verdict (`replay --from-store`) | ✅ [results](docs/BENCHMARKS.md) |

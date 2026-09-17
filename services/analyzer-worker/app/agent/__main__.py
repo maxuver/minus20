@@ -58,7 +58,7 @@ def main() -> None:
 
     async def _run() -> None:
         bot = await build()
-        await bot.run()
+        await asyncio.gather(bot.run(), bot.report_loop())
 
     try:
         asyncio.run(_run())

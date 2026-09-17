@@ -48,6 +48,12 @@ spec:
               value: {{ .Values.agent.timeoutSeconds | quote }}
             - name: MINUS20_AGENT_DAILY_BUDGET_USD
               value: {{ .Values.agent.dailyBudgetUsd | quote }}
+            - name: MINUS20_AGENT_REPORT_WEEKDAY
+              value: {{ .Values.agent.weeklyReport.weekday | quote }}
+            - name: MINUS20_AGENT_REPORT_HOUR_UTC
+              value: {{ .Values.agent.weeklyReport.hourUtc | quote }}
+            - name: MINUS20_AGENT_REPORT_DAYS
+              value: {{ .Values.agent.weeklyReport.days | quote }}
             - name: MINUS20_EMBED_MODEL
               value: {{ .Values.agent.embedModel | quote }}
             - name: MINUS20_EMBED_DIM

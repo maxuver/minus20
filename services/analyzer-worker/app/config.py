@@ -107,6 +107,12 @@ class Settings(BaseSettings):
     agent_max_tool_calls: int = 6
     agent_timeout_seconds: float = 600.0
     agent_daily_budget_usd: float = 2.00
+    # The weekly review sends itself: weekday 0..6 (Monday=0) and UTC hour.
+    # Empty weekday = off. This is the part of the product that works when
+    # nobody asks; the report covers agent_report_days.
+    agent_report_weekday: str = ""
+    agent_report_hour_utc: int = 8
+    agent_report_days: int = 7
     # Memory: local embeddings via Ollama, stored in pgvector (dimension must
     # match the model; nomic-embed-text is 768).
     embed_model: str = "nomic-embed-text"

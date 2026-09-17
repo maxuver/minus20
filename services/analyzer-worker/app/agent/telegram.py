@@ -15,6 +15,7 @@ import base64
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from html import escape
 from typing import Any
 
@@ -55,6 +56,17 @@ TRANSCRIBE_PROMPT = (
     "pod names, namespaces, status columns and timestamps. Then, in one sentence, "
     "say what error it shows. Do not guess at causes."
 )
+
+
+def next_report_at(now: datetime, weekday: int, hour_utc: int) -> datetime:
+    """The next `weekday` (Monday=0) at `hour_utc`:00 UTC strictly after `now`."""
+    now = now.astimezone(timezone.utc)
+    candidate = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
+    days_ahead = (weekday - now.weekday()) % 7
+    candidate += timedelta(days=days_ahead)
+    if candidate <= now:
+        candidate += timedelta(days=7)
+    return candidate
 
 
 def _chat_id(raw: str) -> str:
@@ -130,6 +142,28 @@ class TelegramBot:
             await self._api().post("/sendChatAction", json={"chat_id": chat_id, "action": "typing"})
         except Exception as exc:  # noqa: BLE001 - cosmetic; the answer still arrives
             logger.debug("typing indicator failed: %s", exc)
+
+    async def report_loop(self, sleep=asyncio.sleep, now=lambda: datetime.now(timezone.utc)) -> None:
+        """Send the weekly review to every allowed chat on schedule, forever.
+
+        Off unless MINUS20_AGENT_REPORT_WEEKDAY is set. Sleeps until the next
+        slot, sends, repeats; a failure is logged and the next slot still comes.
+        """
+        weekday_raw = (self._cfg.agent_report_weekday or "").strip()
+        if not weekday_raw:
+            return
+        weekday = int(weekday_raw) % 7
+        while True:
+            due = next_report_at(now(), weekday, self._cfg.agent_report_hour_utc)
+            logger.info("weekly review scheduled for %s UTC", due.strftime("%a %Y-%m-%d %H:%M"))
+            await sleep(max(0.0, (due - now()).total_seconds()))
+            try:
+                reply = Reply(await self._report(str(self._cfg.agent_report_days)), mono=True)
+                for chat_id in sorted(self._allowed):
+                    await self._send(chat_id, reply)
+                logger.info("weekly review sent to %d chat(s)", len(self._allowed))
+            except Exception as exc:  # noqa: BLE001 - the next week must still come
+                logger.warning("weekly review failed: %s", exc)
 
     async def run(self) -> None:
         """Long-poll forever. Each update is handled in turn; errors are logged, never fatal."""

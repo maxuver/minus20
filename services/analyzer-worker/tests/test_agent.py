@@ -15,6 +15,8 @@ CC-37  The report's numbers come from SQL and render without a model; the
        narrative is optional.
 CC-38  The bot serves only allow-listed chats and routes commands.
 CC-39  Ollama message translation carries tool results in Ollama's shape.
+CC-59  The weekly review sends itself on schedule to every allowed chat, and
+       is off unless a weekday is configured.
 """
 
 from __future__ import annotations
@@ -614,6 +616,44 @@ async def test_bot_report_is_monospace_and_survives_no_model():
     reply = await bot.dispatch("42", "/report 7")
     assert reply.mono
     assert "INCIDENT REVIEW" in reply.text and "OOMKilled" in reply.text
+
+
+def test_next_report_slot_is_the_coming_weekday_at_the_hour():  # CC-59
+    from app.agent.telegram import next_report_at
+
+    wed = datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)  # a Wednesday, 10:00
+    assert next_report_at(wed, 0, 8) == datetime(2026, 9, 21, 8, 0, tzinfo=timezone.utc)  # next Monday 08:00
+    assert next_report_at(wed, 2, 8) == datetime(2026, 9, 23, 8, 0, tzinfo=timezone.utc)  # today's slot passed: next week
+    assert next_report_at(wed, 2, 12) == datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)  # today's slot still ahead
+
+
+async def test_weekly_review_sends_itself_on_schedule():  # CC-59
+    """The part that works when nobody asks: the review arrives in every allowed chat."""
+    pool = FakePool(totals={"total": 4, "analyzed": 4, "critical": 0, "confirmed": 0, "refuted": 0, "cost_usd": 0, "avg_latency_ms": 0})
+    bot, sent = _bot(pool=pool)
+    bot._cfg = _cfg(agent_report_weekday="0", agent_report_hour_utc=8, agent_report_days=7, telegram_chat_id="42,43")
+    bot._allowed = {"42", "43"}
+    clock = [datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)]
+    slept: list[float] = []
+
+    async def fake_sleep(seconds):
+        slept.append(seconds)
+        clock[0] += timedelta(seconds=seconds)
+        if len(slept) == 2:  # one review sent; stop the forever-loop
+            raise asyncio.CancelledError
+
+    import asyncio
+
+    with pytest.raises(asyncio.CancelledError):
+        await bot.report_loop(sleep=fake_sleep, now=lambda: clock[0])
+    assert slept[0] == (datetime(2026, 9, 21, 8, 0, tzinfo=timezone.utc) - datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)).total_seconds()
+    assert [m["chat_id"] for m in sent] == ["42", "43"]
+    assert "INCIDENT REVIEW" in sent[0]["text"] and sent[0]["text"].startswith("<pre>")
+
+    # off by default: returns at once, nothing sent
+    bot2, sent2 = _bot(pool=pool)
+    await bot2.report_loop()
+    assert sent2 == []
 
 
 async def test_bot_group_command_suffix_is_stripped():

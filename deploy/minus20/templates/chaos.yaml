@@ -1,0 +1,90 @@
+{{- if .Values.demo.chaos.enabled }}
+# DEMO ONLY. Breaks a pod on a schedule and pages the reflex about it, so an
+# unattended demo cluster produces real incidents (real pod, real events,
+# real logs) with nobody at the keyboard. This is the one thing in the chart
+# that writes to the cluster, and it does so under its OWN ServiceAccount
+# with create/delete on pods in this namespace only. The product's
+# ServiceAccount ({{ .Release.Name }}-analyzer) stays read-only. Never enable
+# this on a cluster you care about.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-chaos
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chaos
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-chaos
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chaos
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-chaos
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chaos
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-chaos
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Release.Name }}-chaos
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-chaos
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+    app.kubernetes.io/component: chaos
+spec:
+  schedule: {{ .Values.demo.chaos.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: chaos
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ .Release.Name }}-chaos
+          containers:
+            - name: chaos
+              image: {{ .Values.images.analyzer }}
+              imagePullPolicy: {{ .Values.images.pullPolicy }}
+              command: ["python", "-m", "app.chaos"]
+              {{- if .Values.demo.chaos.mode }}
+              args: ["--mode", {{ .Values.demo.chaos.mode | quote }}]
+              {{- end }}
+              env:
+                - name: MINUS20_CHAOS_NAMESPACE
+                  value: {{ .Release.Namespace | quote }}
+                - name: MINUS20_CHAOS_INGEST_URL
+                  value: "http://{{ .Release.Name }}-ingest-api:8080/webhook/alertmanager"
+                - name: MINUS20_LOG_LEVEL
+                  value: {{ .Values.config.logLevel | default "INFO" | quote }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+{{- end }}

@@ -208,6 +208,30 @@ the other pod. Two model calls for three alerts; the previous cause kept as
 `revised_from`. 130 s from the first alert to the revised hypothesis on the
 local model; a cloud model does the same two calls in about 20 s.
 
+## Unattended: the weekly review sends itself, and a demo that breaks itself
+
+Two knobs make a cluster run for weeks with nobody at the keyboard.
+
+**The weekly review on a schedule.** With `agent.weeklyReport.weekday: "0"`
+(Monday; `hourUtc: 8`, `days: 7`) the agent sends `/report` to every allowed
+chat by itself. Empty weekday (the default) turns it off.
+
+**A demo that produces incidents.** `demo.chaos.enabled: true` installs a
+CronJob (`schedule: "0 */6 * * *"`) that removes the previous chaos pod,
+creates one that fails in a realistic way (`missing-secret`,
+`db-unreachable`, `wrong-host`, `oom`, `bad-image`; random unless
+`demo.chaos.mode` is set), waits until the cluster shows the failure and
+posts the Alertmanager-shaped alert to ingest-api. From there it is the real
+path: real pod, real events, real logs, a real hypothesis, real history for
+`/report` and for the engineer's verdicts. This is the one component in the
+chart that writes to the cluster: it runs under its own ServiceAccount with
+create/delete on pods in the release namespace only, and the product's
+ServiceAccount stays read-only. Never enable it on a cluster you care about.
+Run one now: `kubectl -n minus20 create job chaos-now --from=cronjob/m20-chaos`.
+
+Measured on kind, 2026-09-17: job created `chaos-wrong-host-1035`, saw the
+first restart after 11 s, posted the alert; the reflex answered in 63 s.
+
 ## Real LLM backend
 
 Selecting a backend is one value; the code never changes (ADR-0002).
@@ -247,8 +271,21 @@ helm upgrade --install m20 deploy/minus20 -n minus20   --set config.llmProvider=
 ```
 
 Measured 2026-09-13: hard benchmark 5/5 in 7.6 s average (`docs/BENCHMARKS.md`).
-Google's free tier may use your data to improve its products; use a paid key
-or a local model for real logs.
+Google's free tier may use your data to improve its products, and its daily
+quota ran out most days in testing; use a paid key or a local model for real
+logs.
+
+**Mistral** (EU-hosted; a free "Experiment" tier with 1 B tokens a month, 1
+request per second, and the same training caveat as Gemini; paid tiers do
+not train). Key from console.mistral.ai, same secret name, same adapter:
+
+```bash
+kubectl -n minus20 create secret generic m20-llm --from-literal=openai-api-key='...'
+helm upgrade --install m20 deploy/minus20 -n minus20   --set config.llmProvider=openai   --set config.openaiBaseUrl=https://api.mistral.ai/v1   --set config.openaiModel=mistral-small-latest   --set config.openaiPriceInPerMtok=0 --set config.openaiPriceOutPerMtok=0
+```
+
+**DeepSeek** is the adapter's default base URL: only the key and the model
+(`deepseek-flash`) are needed; about $0.001 per analysed alert at list price.
 
 **Tiered: cloud when it answers, local when it does not.** `llmFallbackProvider`
 names a second backend used only when the first raises (quota, outage,

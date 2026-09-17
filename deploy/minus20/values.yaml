@@ -110,6 +110,12 @@ agent:
   # for one tool call, 8 min for four); a cloud model answers in ~20s.
   timeoutSeconds: 600
   dailyBudgetUsd: 2
+  # The weekly review sends itself to every allowed chat: weekday 0..6
+  # (Monday=0) at hourUtc. Empty weekday = off. Covers the last `days`.
+  weeklyReport:
+    weekday: ""
+    hourUtc: 8
+    days: 7
   # Local embeddings through the same Ollama as the LLM; dimension must match.
   embedModel: nomic-embed-text
   embedDim: 768
@@ -150,3 +156,15 @@ resources:
   limits:
     cpu: 250m
     memory: 256Mi
+
+# DEMO ONLY: an unattended demo cluster that breaks a pod on a schedule and
+# pages the reflex about it, so incidents keep happening with nobody at the
+# keyboard. The one thing in this chart that writes to the cluster; it runs
+# under its own ServiceAccount (create/delete pods in this namespace only)
+# and the product's ServiceAccount stays read-only. Modes: missing-secret,
+# db-unreachable, wrong-host, oom, bad-image; empty mode = random each run.
+demo:
+  chaos:
+    enabled: false
+    schedule: "0 */6 * * *"
+    mode: ""
