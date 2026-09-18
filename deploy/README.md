@@ -228,6 +228,26 @@ chart that writes to the cluster: it runs under its own ServiceAccount with
 create/delete on pods in the release namespace only, and the product's
 ServiceAccount stays read-only. Never enable it on a cluster you care about.
 Run one now: `kubectl -n minus20 create job chaos-now --from=cronjob/m20-chaos`.
+With `demo.chaos.runOnInstall: true` (the default when chaos is enabled) a
+Helm post-install hook runs it once right after `helm install`, so the first
+real hypothesis is in the chat a few minutes after the install, before any
+schedule fires.
+
+## Paste mode: kubectl output in, the alert-path answer out
+
+The fastest way to see what the product does is not to install it. Paste
+the output of `kubectl describe pod`, `kubectl logs` or `kubectl get events`
+into the bot: it is shaped into the same alert + context the reflex works
+on, redacted the same way, and answered by the same one-call backend, so the
+reply is exactly the message the installed product would have sent about a
+minute after the alert. No tool runs, nothing is stored. Owners of the bot
+have it by default.
+
+`agent.publicTrial.enabled: true` opens paste mode, and only paste mode, to
+chats that are not on the allow-list: no commands, no tools, no memory,
+`agent.publicTrial.dailyLimit` pastes per chat per day, and a link to the
+project after the answer. Meant for a public demo bot; leave it off on a
+team's bot.
 
 Measured on kind, 2026-09-17: job created `chaos-wrong-host-1035`, saw the
 first restart after 11 s, posted the alert; the reflex answered in 63 s.

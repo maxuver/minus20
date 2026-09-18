@@ -13,6 +13,11 @@ leave.
 
 It never acts on your cluster. It recommends; the engineer decides.
 
+**Try it without installing:** paste the output of `kubectl describe pod`
+or `kubectl logs` into the bot and get the same message the installed
+product sends after an alert. Owners of any Minus20 bot have this today; a
+public trial bot follows once the demo cluster has a permanent home.
+
 *Until 2026-09-17 this project was called SentinelOps; the old repository URL,
 chart and image names redirect or remain, and `SENTINELOPS_*` environment
 variables became `MINUS20_*`.*
