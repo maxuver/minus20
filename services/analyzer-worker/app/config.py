@@ -113,6 +113,13 @@ class Settings(BaseSettings):
     agent_report_weekday: str = ""
     agent_report_hour_utc: int = 8
     agent_report_days: int = 7
+    # Public trial: chats NOT on the allow-list may use paste mode only
+    # (kubectl output in, hypothesis out; no tools, no memory, nothing stored),
+    # capped per chat per day. Off by default: the bot answers its owners only.
+    agent_public_trial: bool = False
+    agent_public_daily_limit: int = 5
+    # Where a trial user is pointed after their first hypothesis.
+    agent_public_link: str = "https://github.com/maxuver/minus20"
     # Memory: local embeddings via Ollama, stored in pgvector (dimension must
     # match the model; nomic-embed-text is 768).
     embed_model: str = "nomic-embed-text"

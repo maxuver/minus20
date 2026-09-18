@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minus20: minus twenty minutes of not knowing</title>
+<meta name="description" content="Open-source incident triage for Kubernetes. Alert in, evidence gathered, a root-cause hypothesis with its own disproof in your chat in under a minute. Runs inside your cluster; the logs never leave.">
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --line: #1f2937; --text: #e5e7eb; --muted: #9ca3af;
+    --accent: #f59e0b; --ok: #34d399; --warn: #f87171; --code: #0f1620;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, "Segoe UI", Inter, Roboto, sans-serif; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  main { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; }
+  header.hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; letter-spacing: .02em; color: var(--muted); font-size: 14px; text-transform: uppercase; }
+  h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.05; margin: 12px 0 18px; letter-spacing: -.02em; }
+  h1 .num { color: var(--accent); }
+  .lead { font-size: 20px; color: var(--muted); max-width: 720px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+  .btn { display: inline-block; padding: 12px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-weight: 600; }
+  .btn.primary { background: var(--accent); color: #111; border-color: var(--accent); }
+  .btn:hover { text-decoration: none; filter: brightness(1.08); }
+  section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 26px; margin: 0 0 12px; letter-spacing: -.01em; }
+  h3 { font-size: 18px; margin: 24px 0 8px; }
+  p { margin: 10px 0; }
+  .muted { color: var(--muted); }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .card h3 { margin-top: 0; }
+  .num-big { font-size: 40px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .msg { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 18px 20px; font-size: 15px; }
+  .msg .row { margin: 6px 0; } .msg b { color: var(--text); } .msg .foot { color: var(--muted); font-size: 13px; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); }
+  .diagram { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow-x: auto; }
+  footer { padding: 32px 0; color: var(--muted); font-size: 14px; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: 6px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <div class="brand">Minus20 &middot; open source &middot; AGPL-3.0</div>
+  <h1><span class="num">Minus twenty minutes</span><br>of not knowing.</h1>
+  <p class="lead">An alert tells you <em>what</em> broke. It never tells you <em>why</em>. The twenty minutes that follow, at 03:00, go into assembling context by hand and guessing. Minus20 takes those minutes off every Kubernetes incident: a falsifiable root-cause hypothesis, with its evidence, in your chat about a minute after the alert. Inside your cluster. The logs never leave.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/maxuver/minus20#quickstart">Install in one command</a>
+    <a class="btn" href="https://github.com/maxuver/minus20">GitHub</a>
+    <a class="btn" href="https://github.com/maxuver/minus20/blob/main/docs/BENCHMARKS.md">Benchmarks, including the misses</a>
+  </div>
+</header>
+
+<section>
+  <h2>The 03:00 problem</h2>
+  <p>The page says <code>KubePodCrashLooping</code>. What you actually need is in five places: the pod's events, its previous container's log, the metrics around the restart, what was deployed in the last hour, and what happened last time. Gathering that by hand takes ten to thirty minutes, and it is the same ten to thirty minutes every time. That is the number an engineering manager is paying for, in sleep and in MTTR.</p>
+  <div class="grid">
+    <div class="card"><div class="num-big">39 s</div><p class="muted">Alert fired to hypothesis in chat, measured on a real EKS cluster with a cloud model (2026-09-15).</p></div>
+    <div class="card"><div class="num-big">~2 min</div><p class="muted">The same, on a 7B model on CPU with nothing leaving the cluster. Average 104 s, p95 130 s over a week on the demo cluster.</p></div>
+    <div class="card"><div class="num-big">2 calls</div><p class="muted">Three different alerts in one namespace at once cost two model calls and produce one hypothesis that explains all three.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>What the engineer receives</h2>
+  <p class="muted">Verbatim shape of a message from the demo cluster, 2026-09-17. Three alerts fired in one namespace eight seconds apart.</p>
+  <div class="msg">
+    <div class="row">🔴 <b>KubePodCrashLooping</b> &nbsp;<span class="muted">minus20 · critical</span></div>
+    <div class="row">🔗 <b>Correlated:</b> 3 alerts in this namespace, one cause<br>
+      <code>KubeDeploymentReplicasMismatch pod=billing-api</code> &nbsp; <code>HighErrorRate pod=m20-ingest-api</code><br>
+      <span class="muted">Revised from: PostgreSQL database is unreachable or misconfigured</span></div>
+    <div class="row">🤖 <b>Likely cause</b> <span class="muted">(high confidence)</span><br>PostgreSQL database outage</div>
+    <div class="row">💥 <b>Blast radius:</b> <code>cluster</code></div>
+    <div class="row">📋 <b>Evidence</b><br>• <code>ERROR could not connect to postgres:5432</code><br>• <code>HighErrorRate alert on a different pod</code></div>
+    <div class="row">🎯 <b>Cheapest way to disprove</b><br><em>Check if the PostgreSQL service is up and accessible from the billing-api pod</em></div>
+    <div class="foot">⏱ ollama · 54529 ms · $0.0000 · #4d75d9f6</div>
+  </div>
+  <p>Every message carries the evidence it is based on and the cheapest observation that would prove it wrong, so checking a wrong answer takes seconds. Reply <code>/wrong 4d75d9f6 &lt;real cause&gt;</code> and the next similar incident is answered from what really happened in <em>your</em> cluster; every verdict also becomes a test the benchmark replays against the next model.</p>
+</section>
+
+<section>
+  <h2>How it works</h2>
+  <div class="diagram">Alertmanager ──webhook──► ingest-api ──► Redis Stream ──► analyzer-worker
+                                                          │
+                          collectors: K8s events · pod logs · Prometheus · Loki · CloudWatch
+                                                          │
+                          REDACTION (mandatory: secrets, tokens, e-mails, IPs)
+                                                          │
+                          dedup · storm grouping · correlation · daily budget
+                                                          │
+                          ONE model call, hard timeout  ──► Postgres (audit trail) ──► Slack / Telegram
+
+Engineer in Telegram ──► agent: read-only tools · memory of verdicts (pgvector) · /report
+Any agent CLI      ──► the same tools over MCP</div>
+  <p>Two always-on processes inside your cluster. The <strong>reflex</strong> is a deterministic pipeline: one bounded model call per alert, and the raw alert is delivered even when the model is down, over budget, or wrong. The <strong>agent</strong> answers follow-up questions with a closed set of read-only tools and remembers the engineer's verdicts. Neither holds a tool that can change anything.</p>
+</section>
+
+<section>
+  <h2>Three decisions worth defending</h2>
+  <div class="grid">
+    <div class="card"><h3>Pipeline, not an agent loop, on the alert path</h3><p class="muted">One call, one hypothesis, a hard timeout, a daily budget. Predictable cost (about $0.001 per alert on a cheap cloud model, $0 locally) and an audit trail of exactly what the model saw.</p></div>
+    <div class="card"><h3>It recommends. It never acts.</h3><p class="muted">Read-only credentials. No write tools. Output is text, never executed. The moment an on-call bot can act, every false positive becomes an incident of its own.</p></div>
+    <div class="card"><h3>Privacy first</h3><p class="muted">Redaction runs before any model call and has no off switch. With a local model nothing leaves the cluster. Which model is a config value; the code never changes.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Fastest way to see it</h2>
+  <p>One Helm install with the demo switch on: it breaks a pod inside the release namespace under its own write-capable service account, pages itself, and the first real hypothesis is in your chat a few minutes later. The product's service account stays read-only.</p>
+<pre><code>kubectl create namespace minus20
+kubectl -n minus20 create secret generic m20-telegram --from-literal=bot-token='&lt;token&gt;'
+helm install m20 oci://ghcr.io/maxuver/charts/minus20 -n minus20 \
+  --set config.notifier=telegram --set config.telegramChatId=&lt;your chat id&gt; \
+  --set config.llmProvider=ollama --set config.ollamaUrl=http://&lt;ollama&gt;:11434 \
+  --set demo.chaos.enabled=true</code></pre>
+  <p class="muted">No Ollama? Any OpenAI-compatible key works (Mistral, DeepSeek, Gemini): <code>--set config.llmProvider=openai --set config.openaiBaseUrl=...</code>. Images are signed (SLSA provenance, verify with <code>gh attestation verify</code>), scanned, and ship an SBOM.</p>
+</section>
+
+<section>
+  <h2>Where it stands</h2>
+  <table>
+    <tr><th>Shipped</th><th>Proof</th></tr>
+    <tr><td>Reflex pipeline: collectors, redaction, dedup, storm grouping, cross-alert correlation, graceful degradation</td><td class="ok">two real EKS runs, destroyed the same session; live on kind daily</td></tr>
+    <tr><td>Agent in Telegram with read-only tools, memory of verdicts, weekly review, screenshots via a local vision model</td><td class="ok">ADR-0005, 190 tests</td></tr>
+    <tr><td>The same tools over MCP for Gemini CLI, Claude Code, Cursor</td><td class="ok">live</td></tr>
+    <tr><td>Benchmark: 6 easy scenarios, 10 hard ones, graded on the stated cause only</td><td class="ok">7B local: easy 6/6, hard 6/10 · cloud: easy 6/6, hard 6 of 7 served</td></tr>
+    <tr><td>Verdicts become the eval set (<code>replay --from-store</code>)</td><td class="ok">first run 2/3, one false pass found and fixed</td></tr>
+    <tr><td>Helm chart (OCI), signed multi-arch images, Terraform for EKS</td><td class="ok">CI: lint, tests, Trivy, gitleaks, provenance, SBOM</td></tr>
+    <tr><th>Not yet</th><th></th></tr>
+    <tr><td>Topology-aware correlation (owner references, service graph); ranked hypotheses; OpenSearch collector; a public paste-and-ask bot</td><td class="warn">roadmap</td></tr>
+    <tr><td>Auto-remediation</td><td class="warn">never in the open version</td></tr>
+  </table>
+  <p class="muted">The numbers above are measured and published with the misses. Nothing here has been measured against someone else's production incidents yet; the eval set grows from real verdicts for exactly that reason.</p>
+</section>
+
+<footer>
+  <span class="tag">AGPL-3.0 + commercial licence</span><span class="tag">Any Kubernetes</span><span class="tag">Formerly SentinelOps</span>
+  <p><a href="https://github.com/maxuver/minus20">github.com/maxuver/minus20</a> · Built by Maxim Patsyuk. Where AWS DevOps Agent can't be used: logs that must stay in the cluster, clusters not on AWS, a price known in advance, open code.</p>
+</footer>
+
+</main>
+</body>
+</html>

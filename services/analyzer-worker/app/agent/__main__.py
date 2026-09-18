@@ -42,10 +42,12 @@ async def build() -> TelegramBot:
     else:
         logger.warning("MINUS20_STORE is not postgres: no incident history, no memory")
 
+    from ..backends import get_backend
+
     chat = get_chat_backend(cfg)
     ctx = ToolContext(cfg=cfg, pool=pool, memory=memory)
     agent = Agent(chat, ctx, InMemoryBudget(cfg.agent_daily_budget_usd), cfg)
-    return TelegramBot(cfg, agent, chat, memory, pool, runbooks_dir=cfg.runbooks_dir)
+    return TelegramBot(cfg, agent, chat, memory, pool, runbooks_dir=cfg.runbooks_dir, reflex=get_backend(cfg))
 
 
 def main() -> None:

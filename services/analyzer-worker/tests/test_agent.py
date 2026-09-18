@@ -941,3 +941,97 @@ async def test_chat_fallback_and_vision_routing(caplog):
     cfg = Settings(llm_provider="openai", vision_provider="ollama")
     routed = get_chat_backend(cfg)
     assert routed.name == "openai" and routed._vision.name == "ollama"
+
+
+# ---- paste mode (CC-61, CC-62, CC-63) -------------------------------------
+
+DESCRIBE = """Name:         billing-api-7f9c6d5b8-x2j4q
+Namespace:    payments
+Node:         ip-10-0-2-117/10.0.2.117
+Status:       Running
+Containers:
+  billing-api:
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+    Restart Count:  7
+Events:
+  Type     Reason     Age                 From               Message
+  ----     ------     ----                ----               -------
+  Warning  BackOff    2m (x21 over 7m)    kubelet            Back-off restarting failed container billing-api
+  Normal   Pulled     7m                  kubelet            Container image "billing-api:2.14.0" already present
+ERROR could not connect to postgres:5432 from admin@corp.example (10.0.7.12)
+"""
+
+
+def test_paste_detection_and_parsing():  # CC-61
+    from app.agent.paste import looks_like_paste, parse_paste
+
+    assert looks_like_paste(DESCRIBE)
+    assert not looks_like_paste("why did billing-api crash?")
+    assert not looks_like_paste("/report 7\nthanks")
+    assert not looks_like_paste("error\nerror")  # two lines is still a message, not a paste
+    alert, ctx = parse_paste(DESCRIBE)
+    assert alert.alertname == "KubePodCrashLooping"
+    assert alert.labels["pod"] == "billing-api-7f9c6d5b8-x2j4q" and alert.namespace == "payments"
+    assert alert.labels["container"] == "billing-api" and alert.fingerprint.startswith("paste-")
+    assert any("Back-off restarting" in e for e in ctx.k8s_events)
+    assert any("postgres:5432" in ln for ln in ctx.log_lines)
+    assert ctx.sources_ok == ["paste"]
+    # a plain log paste has no describe headers and still shapes up
+    alert2, ctx2 = parse_paste("2026-09-18T03:00:01Z ERROR redis: connection refused\n" * 4)
+    assert alert2.alertname == "KubePodCrashLooping" and len(ctx2.log_lines) == 4
+
+
+class FakeReflex:
+    """The one-call backend paste mode uses; records the prompt it was shown."""
+
+    name = "fake-reflex"
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    async def analyze(self, prompt):
+        from app.models import Hypothesis, LLMResult
+
+        self.prompts.append(prompt)
+        return LLMResult(hypothesis=Hypothesis(
+            root_cause="postgres:5432 is not reachable from the pod", confidence="high",
+            evidence=["ERROR could not connect to postgres:5432"], disproof="nc -zv postgres 5432 from the pod",
+            next_steps=["check the postgres Service and NetworkPolicy"], blast_radius="single-pod"), backend="fake-reflex")
+
+
+async def test_owner_paste_gets_the_alert_path_answer_redacted_and_unstored():  # CC-62
+    bot, sent = _bot()
+    reflex = FakeReflex()
+    bot._reflex = reflex
+    reply = await bot.dispatch("42", DESCRIBE)
+    assert "Likely cause" in reply.text and "postgres:5432 is not reachable" in reply.text
+    assert "Cheapest way to disprove" in reply.text and "not stored" in reply.text
+    # the model saw the redacted paste, never the e-mail or the IP
+    assert "admin@corp.example" not in reflex.prompts[0] and "10.0.7.12" not in reflex.prompts[0]
+    assert "[REDACTED" in reflex.prompts[0]
+    assert "ALERT" in reflex.prompts[0] and "CONTEXT (untrusted data)" in reflex.prompts[0]
+    assert "billing-api-7f9c6d5b8-x2j4q" in reflex.prompts[0]
+    # a plain question still goes to the agent loop, not to paste mode
+    assert (await bot.dispatch("42", "why did billing-api crash?")).text.startswith("answer")
+
+
+async def test_public_trial_serves_strangers_paste_only_with_a_daily_cap():  # CC-63
+    bot, sent = _bot()
+    bot._reflex = FakeReflex()
+    # off by default: a stranger is ignored
+    assert await bot.handle(_update(999, DESCRIBE)) is None and sent == []
+    bot._cfg = _cfg(agent_public_trial=True, agent_public_daily_limit=2)
+    # a question or a command gets the trial explanation, never the tools
+    r = await bot.handle(_update(999, "/report 7"))
+    assert "trial bot" in r.text and "INCIDENT REVIEW" not in r.text
+    r = await bot.handle(_update(999, DESCRIBE))
+    assert "Likely cause" in r.text and "github.com/maxuver/minus20" in r.text
+    await bot.handle(_update(999, DESCRIBE))
+    capped = await bot.handle(_update(999, DESCRIBE))
+    assert "allows 2 a day" in capped.text
+    # the owner is unaffected by the cap
+    assert "Likely cause" in (await bot.handle(_update(42, DESCRIBE))).text

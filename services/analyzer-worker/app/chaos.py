@@ -150,12 +150,21 @@ class Chaos:
         return name
 
 
-async def _http_post(url: str, payload: dict[str, Any]) -> None:  # pragma: no cover - real network
+async def _http_post(url: str, payload: dict[str, Any], attempts: int = 6, delay: float = 10.0) -> None:  # pragma: no cover - real network
+    """Right after `helm install` ingest-api may still be starting; wait for it."""
     import httpx
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(url, content=json.dumps(payload), headers={"Content-Type": "application/json"})
-        resp.raise_for_status()
+        for attempt in range(1, attempts + 1):
+            try:
+                resp = await client.post(url, content=json.dumps(payload), headers={"Content-Type": "application/json"})
+                resp.raise_for_status()
+                return
+            except (httpx.HTTPError, OSError) as exc:
+                if attempt == attempts:
+                    raise
+                logger.info("chaos: ingest not ready (%s); retry %d/%d in %.0fs", exc.__class__.__name__, attempt, attempts, delay)
+                await asyncio.sleep(delay)
 
 
 async def _main(mode: str | None) -> None:  # pragma: no cover - real cluster path

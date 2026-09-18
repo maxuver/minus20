@@ -54,6 +54,12 @@ spec:
               value: {{ .Values.agent.weeklyReport.hourUtc | quote }}
             - name: MINUS20_AGENT_REPORT_DAYS
               value: {{ .Values.agent.weeklyReport.days | quote }}
+            - name: MINUS20_AGENT_PUBLIC_TRIAL
+              value: {{ .Values.agent.publicTrial.enabled | quote }}
+            - name: MINUS20_AGENT_PUBLIC_DAILY_LIMIT
+              value: {{ .Values.agent.publicTrial.dailyLimit | quote }}
+            - name: MINUS20_AGENT_PUBLIC_LINK
+              value: {{ .Values.agent.publicTrial.link | quote }}
             - name: MINUS20_EMBED_MODEL
               value: {{ .Values.agent.embedModel | quote }}
             - name: MINUS20_EMBED_DIM

@@ -116,6 +116,13 @@ agent:
     weekday: ""
     hourUtc: 8
     days: 7
+  # Public trial: chats NOT on the allow-list may paste kubectl output and get
+  # the alert-path answer (no tools, no memory, nothing stored), a few times a
+  # day. Off by default. Meant for a public demo bot, not for a team's bot.
+  publicTrial:
+    enabled: false
+    dailyLimit: 5
+    link: https://github.com/maxuver/minus20
   # Local embeddings through the same Ollama as the LLM; dimension must match.
   embedModel: nomic-embed-text
   embedDim: 768
@@ -168,3 +175,6 @@ demo:
     enabled: false
     schedule: "0 */6 * * *"
     mode: ""
+    # Also run once right after `helm install` / `helm upgrade`, so the first
+    # real hypothesis is in the chat a couple of minutes after the install.
+    runOnInstall: true

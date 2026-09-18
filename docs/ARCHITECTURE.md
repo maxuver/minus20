@@ -60,6 +60,20 @@ Tests inject fakes at the same ports (`httpx.MockTransport`, fake pools, fake
 Kubernetes clients), which is why the whole suite runs offline in about a
 second.
 
+## Why Python
+
+The services are network-bound: almost all of their time is spent waiting on
+Loki, Prometheus, the Kubernetes API and the model. The runtime is not in the
+latency. Python gave a solo project faster iteration and the ecosystem the
+product actually depends on (the official MCP SDK, pydantic, httpx,
+kubernetes_asyncio, asyncpg with pgvector, every LLM client). What Go or
+Rust would have bought: images of ~20 MB instead of ~200 MB, faster starts,
+and fewer base-image CVEs to chase (Trivy found 12 in `python:3.12-slim`
+on its first run; the Dockerfiles now apply security updates at build). The
+hot path, `ingest-api`, is a hundred lines and can be rewritten on its own if
+it ever becomes the bottleneck. A Kubernetes operator with CRDs would be
+written in Go; this is not one.
+
 ## What flows where, and what never leaves
 
 1. Alertmanager POSTs the alert. `ingest-api` validates it with Pydantic and

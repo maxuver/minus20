@@ -20,11 +20,15 @@ from html import escape
 from typing import Any
 
 from ..config import Settings
-from ..redaction import redact
+from ..models import Incident, IncidentStatus
+from ..notifiers import format_message
+from ..prompt import build_prompt
+from ..redaction import redact, redact_bundle
 from . import report
 from .chat import ChatBackend
 from .loop import Agent
 from .memory import Memory
+from .paste import looks_like_paste, parse_paste
 
 logger = logging.getLogger("minus20.agent.telegram")
 
@@ -34,7 +38,9 @@ HELP = (
     "  why did billing-api crash?\n"
     "  what changed in payments in the last 6 hours?\n"
     "  has this happened before?\n"
-    "Or send a screenshot of the error; add a question as its caption.\n\n"
+    "Or send a screenshot of the error; add a question as its caption.\n"
+    "Or paste the output of kubectl describe pod / kubectl logs / kubectl get events:\n"
+    "  I answer it the way I would answer the alert, with evidence and the cheapest disproof.\n\n"
     "Commands:\n"
     "  /report [days]        incident review for the last N days (default 7)\n"
     "  /ok <id> [note]       the hypothesis for incident #id was right\n"
@@ -43,6 +49,15 @@ HELP = (
     "  /scenario <id>        export the incident as a replay scenario (a regression test for the triage)\n"
     "  /status               what I can reach right now\n"
     "  /help                 this text"
+)
+
+TRIAL_HELP = (
+    "This is the Minus20 trial bot. Paste the output of kubectl describe pod, kubectl logs "
+    "or kubectl get events for the thing that is broken, and I answer it the way the installed "
+    "product answers an alert: likely cause, evidence, the cheapest way to disprove it, next steps.\n\n"
+    "Nothing you paste is stored; secrets, tokens, e-mails and IPs are masked before any model sees "
+    "them. A few pastes a day per chat. Installed in your own cluster, with a local model, "
+    "nothing leaves it: https://github.com/maxuver/minus20"
 )
 
 MAX_MESSAGE = 3_900  # Telegram caps at 4096; leave room for tags
@@ -100,6 +115,7 @@ class TelegramBot:
         pool: Any,
         client=None,
         runbooks_dir: str = "",
+        reflex=None,
     ) -> None:
         self._cfg = cfg
         self._agent = agent
@@ -108,9 +124,13 @@ class TelegramBot:
         self._pool = pool
         self._client = client
         self._runbooks_dir = runbooks_dir
+        # The one-call reflex backend, for paste mode: same prompt, same
+        # redaction, same answer shape as the alert path.
+        self._reflex = reflex
         self._allowed = {_chat_id(c) for c in cfg.telegram_chat_id.split(",") if c.strip()}
         self._history: dict[str, list[dict]] = {}
         self._offset = 0
+        self._trial_used: dict[tuple[str, str], int] = {}  # (chat, day) -> pastes today
 
     # --- transport -----------------------------------------------------------
 
@@ -196,6 +216,8 @@ class TelegramBot:
         if not chat_id or (not text and image is None):
             return None
         if chat_id not in self._allowed:
+            if self._cfg.agent_public_trial and image is None:
+                return await self._handle_trial(chat_id, text)
             logger.info("ignored message from chat %s (not allow-listed)", chat_id)
             return None
         await self._typing(chat_id)
@@ -208,12 +230,14 @@ class TelegramBot:
                 # One message may carry several requests ("/status" then a
                 # question on the next line, or "/status why is x down?").
                 # Each is answered; before, only the first command was.
-                for segment in self._segments(text):
+                # A paste is one request, however many lines it has.
+                segments = [text] if (self._reflex is not None and looks_like_paste(text)) else self._segments(text)
+                for segment in segments:
                     reply = await self.dispatch(chat_id, segment)
                     await self._send(chat_id, reply)
                 logger.info(
                     "chat %s: %s → %d segment(s) in %.1fs",
-                    chat_id, text.split()[0][:16], len(self._segments(text)), time.monotonic() - started,
+                    chat_id, text.split()[0][:16], len(segments), time.monotonic() - started,
                 )
                 return reply
         except Exception as exc:
@@ -222,6 +246,54 @@ class TelegramBot:
         await self._send(chat_id, reply)
         logger.info("chat %s: image → answered in %.1fs", chat_id, time.monotonic() - started)
         return reply
+
+    # --- paste mode ----------------------------------------------------------
+
+    async def _handle_trial(self, chat_id: str, text: str) -> Reply | None:
+        """A stranger's chat: paste mode only, a few times a day, nothing stored."""
+        if not looks_like_paste(text):
+            # /start, /help, a question, anything that is not a paste: the same
+            # short explanation. No commands, no tools, no memory for strangers.
+            reply = Reply(TRIAL_HELP)
+            await self._send(chat_id, reply)
+            return reply
+        day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        used = self._trial_used.get((chat_id, day), 0)
+        if used >= self._cfg.agent_public_daily_limit:
+            reply = Reply(f"That is {used} today; the trial allows {self._cfg.agent_public_daily_limit} a day. "
+                          f"Installed in your own cluster there is no limit: {self._cfg.agent_public_link}")
+            await self._send(chat_id, reply)
+            return reply
+        self._trial_used[(chat_id, day)] = used + 1
+        await self._typing(chat_id)
+        reply = await self._paste(text)
+        await self._send(chat_id, reply)
+        logger.info("trial chat %s: paste %d/%d answered", chat_id, used + 1, self._cfg.agent_public_daily_limit)
+        return reply
+
+    async def _paste(self, text: str) -> Reply:
+        """kubectl output in, the alert-path answer out. No tools, nothing stored."""
+        if self._reflex is None:
+            return Reply("Paste mode is not configured on this bot (no analysis backend).")
+        alert, raw = parse_paste(text)
+        context = redact_bundle(raw)
+        prompt = build_prompt(alert, context)
+        started = time.monotonic()
+        try:
+            result = await asyncio.wait_for(self._reflex.analyze(prompt), timeout=self._cfg.llm_timeout_seconds)
+        except Exception as exc:  # noqa: BLE001 - reported, never raised at the chat
+            return Reply(f"I could not analyse that: {redact(str(exc))[:200]}")
+        incident = Incident(
+            fingerprint=alert.fingerprint, alertname=alert.alertname, namespace=alert.namespace,
+            severity=alert.severity, alert_summary=alert.summary(), status=IncidentStatus.ANALYZED,
+            hypothesis=result.hypothesis, backend=getattr(result, "backend", "") or self._reflex.name,
+            cost_usd=result.cost_usd, latency_ms=int((time.monotonic() - started) * 1000), context=context.render(),
+        )
+        body = format_message(incident)
+        counted = f"{len(context.k8s_events)} events, {len(context.metrics)} metrics, {len(context.log_lines)} log lines"
+        footer = (f"\n\n<i>Read from your paste: {counted}. One-off, not stored. "
+                  f"Installed, this arrives by itself about a minute after the alert: {escape(self._cfg.agent_public_link)}</i>")
+        return Reply(body + footer)
 
     @staticmethod
     def _segments(text: str) -> list[str]:
@@ -301,6 +373,8 @@ class TelegramBot:
             return Reply(await self._scenario(rest), mono=True)
         if cmd.startswith("/"):
             return Reply(f"Unknown command {cmd}. /help lists what I can do.")
+        if self._reflex is not None and looks_like_paste(text):
+            return await self._paste(text)
         return Reply(await self._ask(chat_id, text))
 
     # --- handlers ------------------------------------------------------------
