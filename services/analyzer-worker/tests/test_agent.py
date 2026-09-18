@@ -1004,7 +1004,7 @@ class FakeReflex:
 
 
 async def test_owner_paste_gets_the_alert_path_answer_redacted_and_unstored():  # CC-62
-    bot, sent = _bot()
+    bot, _sent = _bot()
     reflex = FakeReflex()
     bot._reflex = reflex
     reply = await bot.dispatch("42", DESCRIBE)
