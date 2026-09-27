@@ -4,149 +4,435 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Minus20: minus twenty minutes of not knowing</title>
-<meta name="description" content="Open-source incident triage for Kubernetes. Alert in, evidence gathered, a root-cause hypothesis with its own disproof in your chat in under a minute. Runs inside your cluster; the logs never leave.">
+<meta name="description" content="Open-source incident triage for Kubernetes. Alert in, evidence gathered, a falsifiable root-cause hypothesis in your chat about a minute later. Runs inside your cluster; the logs never leave.">
+<meta name="color-scheme" content="dark">
 <style>
   :root {
-    --bg: #0b0f14; --panel: #121821; --line: #1f2937; --text: #e5e7eb; --muted: #9ca3af;
-    --accent: #f59e0b; --ok: #34d399; --warn: #f87171; --code: #0f1620;
+    --bg: #07090d; --bg2: #0c1118; --panel: rgba(18, 25, 35, .78); --panel-solid: #121923;
+    --line: rgba(148, 163, 184, .14); --line-strong: rgba(148, 163, 184, .28);
+    --text: #e8ecf2; --muted: #94a0b1; --dim: #5d6878;
+    --amber: #ffb020; --amber-2: #ff7a1a; --red: #ff5d5d; --green: #3ddc97; --blue: #6ea8ff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    --sy: 0; --mx: 0; --my: 0; --p: 0;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, "Segoe UI", Inter, Roboto, sans-serif; }
-  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
-  main { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; }
-  header.hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
-  .brand { font-weight: 700; letter-spacing: .02em; color: var(--muted); font-size: 14px; text-transform: uppercase; }
-  h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.05; margin: 12px 0 18px; letter-spacing: -.02em; }
-  h1 .num { color: var(--accent); }
-  .lead { font-size: 20px; color: var(--muted); max-width: 720px; }
-  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
-  .btn { display: inline-block; padding: 12px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-weight: 600; }
-  .btn.primary { background: var(--accent); color: #111; border-color: var(--accent); }
-  .btn:hover { text-decoration: none; filter: brightness(1.08); }
-  section { padding: 48px 0; border-bottom: 1px solid var(--line); }
-  h2 { font-size: 26px; margin: 0 0 12px; letter-spacing: -.01em; }
-  h3 { font-size: 18px; margin: 24px 0 8px; }
-  p { margin: 10px 0; }
-  .muted { color: var(--muted); }
-  pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
-  pre code { background: none; padding: 0; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 18px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
-  .card h3 { margin-top: 0; }
-  .num-big { font-size: 40px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
-  .msg { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 18px 20px; font-size: 15px; }
-  .msg .row { margin: 6px 0; } .msg b { color: var(--text); } .msg .foot { color: var(--muted); font-size: 13px; margin-top: 12px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 15px; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
-  .ok { color: var(--ok); } .warn { color: var(--warn); }
-  .diagram { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow-x: auto; }
-  footer { padding: 32px 0; color: var(--muted); font-size: 14px; }
-  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: 6px; }
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, .mono { font-family: var(--mono); }
+  code { font-size: .92em; background: rgba(255,255,255,.05); border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- top bar ---------- */
+  .bar { position: fixed; inset: 0 0 auto 0; z-index: 50; backdrop-filter: blur(12px); background: rgba(7,9,13,.62); border-bottom: 1px solid var(--line); }
+  .bar .wrap { display: flex; align-items: center; justify-content: space-between; height: 58px; }
+  .logo { font-weight: 800; letter-spacing: -.02em; font-size: 18px; color: var(--text); }
+  .logo b { color: var(--amber); }
+  .bar nav { display: flex; gap: 22px; font-size: 14px; }
+  .bar nav a { color: var(--muted); }
+  .bar nav a:hover { color: var(--text); text-decoration: none; }
+  @media (max-width: 720px) { .bar nav a:not(.gh) { display: none; } }
+
+  /* ---------- hero: 3D scene ---------- */
+  .hero { position: relative; min-height: min(100vh, 940px); min-height: min(100svh, 940px); padding: 120px 0 80px; perspective: 1400px; overflow: hidden; }
+  .floor {
+    position: absolute; left: -50%; right: -50%; bottom: -30%; height: 90%;
+    background-image:
+      linear-gradient(rgba(255,176,32,.16) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,176,32,.16) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: 0 calc(var(--sy) * .6px);
+    transform: rotateX(76deg); transform-origin: 50% 0;
+    mask-image: linear-gradient(to top, #000 10%, transparent 85%);
+    -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 85%);
+    pointer-events: none;
+  }
+  .glow { position: absolute; width: 900px; height: 900px; border-radius: 50%; left: 50%; top: -260px; transform: translate3d(calc(-50% + var(--mx) * 30px), calc(var(--sy) * .25px), 0);
+    background: radial-gradient(circle, rgba(255,140,30,.20), rgba(255,140,30,0) 62%); pointer-events: none; }
+  .ghost-num { position: absolute; right: -2vw; top: 70px; font-weight: 900; font-size: min(46vw, 560px); line-height: .8; letter-spacing: -.06em;
+    color: transparent; -webkit-text-stroke: 1px rgba(255,176,32,.14); pointer-events: none; user-select: none;
+    transform: translate3d(calc(var(--mx) * -24px), calc(var(--sy) * -.35px), -300px); }
+  .hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .95fr); gap: 40px; align-items: center; }
+  @media (max-width: 920px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
+  .hero-grid > *, .msg-wrap > *, .agents > *, .tiles > *, .three > *, .lane > * { min-width: 0; }
+  .eyebrow { display: inline-flex; gap: 10px; align-items: center; font: 600 12.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; background: rgba(255,255,255,.02); }
+  .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 0 rgba(255,93,93,.7); animation: ping 1.8s infinite; }
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(255,93,93,.6); } 80%,100% { box-shadow: 0 0 0 12px rgba(255,93,93,0); } }
+  h1 { font-size: clamp(40px, 5.6vw, 74px); line-height: .98; letter-spacing: -.045em; margin: 22px 0 22px; font-weight: 800; }
+  h1 .amber { background: linear-gradient(95deg, var(--amber), var(--amber-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); max-width: 580px; margin: 0; }
+  .lead strong { color: var(--text); font-weight: 600; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 20px; border-radius: 10px; font-weight: 650; font-size: 15px; border: 1px solid var(--line-strong); color: var(--text); background: rgba(255,255,255,.03); transition: transform .2s, background .2s; }
+  .btn:hover { text-decoration: none; transform: translateY(-2px); background: rgba(255,255,255,.07); }
+  .btn.primary { background: linear-gradient(95deg, var(--amber), var(--amber-2)); color: #140c00; border-color: transparent; }
+  .trust { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 26px; font: 13px/1.4 var(--mono); color: var(--dim); }
+  .trust span::before { content: "✓ "; color: var(--green); }
+
+  /* the stack: alert -> evidence -> hypothesis, separating in depth as you scroll */
+  .scene { position: relative; height: 580px; transform-style: preserve-3d; }
+  @media (max-width: 920px) {
+    .scene { height: 520px; margin-top: 10px; }
+    .stack { transform: rotateX(10deg) rotateY(calc(-8deg + var(--mx) * 6deg)); }
+    .card3d { width: 86%; font-size: 12.5px; }
+    .c-alert { transform: translate3d(-50%, 0, -120px); } .c-evid { transform: translate3d(-50%, 0, -20px); } .c-hyp { transform: translate3d(-50%, 0, 80px); }
+    .clock { right: 6%; top: -20px; }
+    .ghost-num { display: none; }
+  }
+  .stack { position: absolute; inset: 0; transform-style: preserve-3d;
+    transform: rotateX(calc(14deg - var(--my) * 7deg)) rotateY(calc(-22deg + var(--mx) * 12deg)) translateZ(0); transition: transform .12s linear; }
+  .card3d { position: absolute; left: 50%; width: min(420px, 88vw); border-radius: 14px; padding: 16px 18px; border: 1px solid var(--line-strong);
+    background: var(--panel); backdrop-filter: blur(6px); box-shadow: 0 30px 80px rgba(0,0,0,.55); font-size: 13.5px; }
+  .card3d .hd { display: flex; justify-content: space-between; font: 600 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .c-alert { top: 0; transform: translate3d(-58%, 0, calc(-170px - var(--p) * 90px)); border-color: rgba(255,93,93,.45); }
+  .c-evid  { top: 175px; transform: translate3d(-48%, 0, calc(-20px)); }
+  .c-hyp   { top: 350px; transform: translate3d(-38%, 0, calc(140px + var(--p) * 110px)); border-color: rgba(255,176,32,.55); box-shadow: 0 40px 100px rgba(255,140,30,.18), 0 30px 80px rgba(0,0,0,.55); }
+  .c-alert .t { color: var(--red); font-weight: 700; font-family: var(--mono); }
+  .c-evid ul { margin: 0; padding-left: 16px; font-family: var(--mono); font-size: 12.5px; color: #c9d2de; }
+  .c-hyp .cause { font-size: 16px; font-weight: 700; margin: 2px 0 8px; }
+  .c-hyp .kv { font: 12.5px/1.5 var(--mono); color: var(--muted); }
+  .c-hyp .kv b { color: var(--green); font-weight: 600; }
+  .clock { position: absolute; right: 2%; top: 70px; transform: translateZ(220px); font: 700 13px/1 var(--mono); color: var(--amber); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,176,32,.4); background: rgba(12,17,24,.9); }
+
+  /* ---------- sections ---------- */
+  section { position: relative; padding: 110px 0; border-top: 1px solid var(--line); }
+  .kicker { font: 600 12.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); }
+  h2 { font-size: clamp(30px, 4.2vw, 50px); line-height: 1.05; letter-spacing: -.035em; margin: 14px 0 18px; font-weight: 780; }
+  .sub { color: var(--muted); font-size: 18px; max-width: 700px; }
+  .js .reveal { opacity: 0; transform: translate3d(0, 40px, -60px) rotateX(8deg); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
+  .js .reveal.in { opacity: 1; transform: none; }
+  .depth { perspective: 1200px; }
+
+  /* 20 minutes vs one: the timeline */
+  .race { margin-top: 44px; display: grid; gap: 22px; }
+  .lane { display: grid; grid-template-columns: 170px 1fr 90px; gap: 18px; align-items: center; }
+  @media (max-width: 640px) { .lane { grid-template-columns: 1fr; gap: 8px; } }
+  .lane .who { font-weight: 650; }
+  .lane .who small { display: block; color: var(--dim); font-weight: 400; font-size: 13px; }
+  .track { position: relative; height: 44px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid var(--line); overflow: hidden; }
+  .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 10px; transition: width 2.2s cubic-bezier(.3,.7,.2,1); display: flex; align-items: center; gap: 6px; padding-left: 12px; font: 12px var(--mono); white-space: nowrap; overflow: hidden; }
+  .fill.manual { background: linear-gradient(90deg, rgba(255,93,93,.28), rgba(255,93,93,.12)); color: #ffc3c3; }
+  .fill.m20 { background: linear-gradient(90deg, rgba(255,176,32,.55), rgba(255,122,26,.35)); color: #1a0f00; font-weight: 700; }
+  .race.in .fill.manual, html:not(.js) .fill.manual { width: 100%; }
+  .race.in .fill.m20, html:not(.js) .fill.m20 { width: 7%; }
+  .lane .t { font: 700 20px var(--mono); text-align: right; }
+  @media (max-width: 640px) { .lane .t { text-align: left; } }
+
+  /* number tiles, each floating at its own depth */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 50px; transform-style: preserve-3d; }
+  @media (max-width: 820px) { .tiles { grid-template-columns: 1fr; } }
+  .tile { border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01)); border-radius: 16px; padding: 26px; transition: transform .4s; }
+  .tile:hover { transform: translateY(-6px) translateZ(30px); }
+  .tile .n { font-size: 54px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+  .tile .n em { font-style: normal; color: var(--amber); }
+  .tile p { color: var(--muted); margin: 12px 0 0; font-size: 15px; }
+
+  /* the message, verbatim */
+  .msg-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 48px; align-items: center; margin-top: 30px; }
+  @media (max-width: 920px) { .msg-wrap { grid-template-columns: minmax(0, 1fr); } }
+  .phone { perspective: 1200px; }
+  .msg { transform: rotateY(calc(-10deg + var(--mx) * 6deg)) rotateX(calc(4deg - var(--my) * 4deg)); transform-style: preserve-3d; transition: transform .15s linear;
+    background: var(--panel-solid); border: 1px solid var(--line-strong); border-left: 4px solid var(--amber); border-radius: 16px; padding: 20px 22px; font-size: 14.5px; box-shadow: 0 50px 120px rgba(0,0,0,.6); }
+  .msg .row { margin: 9px 0; }
+  .msg code { font-size: 12.5px; }
+  .msg .foot { color: var(--dim); font: 12px var(--mono); margin-top: 14px; }
+  .points { display: grid; gap: 18px; }
+  .point { display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+  .point .i { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: rgba(255,176,32,.12); color: var(--amber); font-weight: 800; font-family: var(--mono); }
+  .point h3 { margin: 2px 0 4px; font-size: 17px; }
+  .point p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  /* call it by name */
+  .agents { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 48px; align-items: center; margin-top: 30px; }
+  @media (max-width: 920px) { .agents { grid-template-columns: minmax(0, 1fr); } }
+  .tree { background: #1b1d22; border: 1px solid #2b2f36; border-radius: 12px; padding: 14px 0; font: 14.5px/1 var(--mono); color: #c7ccd4; box-shadow: 0 40px 100px rgba(0,0,0,.55);
+    transform: rotateY(calc(12deg + var(--mx) * -6deg)) rotateX(calc(3deg - var(--my) * 3deg)); transition: transform .15s linear; }
+  .tree .head { padding: 6px 18px 12px; color: #d7dbe2; }
+  .tree .head::before { content: "⌄ "; color: #8a919c; }
+  .tree .it { padding: 9px 18px 9px 42px; position: relative; }
+  .tree .it::before { content: "›"; position: absolute; left: 24px; color: #6b727d; }
+  .tree .it.dim { color: #7c838e; }
+  .tree .it.me { color: #fff; background: linear-gradient(90deg, rgba(255,176,32,.22), rgba(255,176,32,0)); border-left: 2px solid var(--amber); }
+  .tree .it.me span { color: var(--amber); }
+  pre.snippet { margin: 18px 0 0; background: #0a0e14; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; color: #cfd6e0; }
+  pre.snippet .c { color: var(--dim); }
+
+  /* pipeline in layers */
+  .pipe { margin-top: 44px; display: grid; gap: 14px; perspective: 1400px; }
+  .stage { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: center; padding: 18px 22px; border-radius: 14px; border: 1px solid var(--line); background: linear-gradient(90deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
+    transform: translateZ(calc(var(--d) * 1px)); }
+  @media (max-width: 720px) { .stage { grid-template-columns: 1fr; gap: 6px; } }
+  .stage .name { font: 700 14px var(--mono); color: var(--amber); }
+  .stage .what { color: var(--muted); font-size: 15px; }
+  .stage.key { border-color: rgba(255,176,32,.45); background: linear-gradient(90deg, rgba(255,176,32,.10), rgba(255,176,32,.02)); }
+  .stage.key .what { color: var(--text); }
+
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
+  @media (max-width: 900px) { .three { grid-template-columns: 1fr; } }
+  .three .tile h3 { margin: 0 0 8px; font-size: 19px; }
+
+  pre.install { background: #0a0e14; border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; color: #d5dce6; margin-top: 26px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 15px; }
+  th, td { text-align: left; padding: 14px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+  td.ok { color: var(--green); font-size: 14px; } td.no { color: var(--red); font-size: 14px; }
+  .scroll-x { overflow-x: auto; }
+
+  footer { border-top: 1px solid var(--line); padding: 50px 0 70px; color: var(--muted); font-size: 14.5px; }
+  footer .big { font-size: clamp(26px, 4vw, 40px); font-weight: 800; letter-spacing: -.03em; color: var(--text); margin-bottom: 14px; }
+  .tag { display: inline-block; font: 12px var(--mono); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin: 0 6px 8px 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .js .reveal { opacity: 1; transform: none; }
+    .stack, .msg, .tree { transform: none !important; }
+    .race .fill.manual { width: 100%; } .race .fill.m20 { width: 7%; }
+  }
 </style>
 </head>
 <body>
-<main>
 
-<header class="hero">
-  <div class="brand">Minus20 &middot; open source &middot; AGPL-3.0</div>
-  <h1><span class="num">Minus twenty minutes</span><br>of not knowing.</h1>
-  <p class="lead">An alert tells you <em>what</em> broke. It never tells you <em>why</em>. The twenty minutes that follow, at 03:00, go into assembling context by hand and guessing. Minus20 takes those minutes off every Kubernetes incident: a falsifiable root-cause hypothesis, with its evidence, in your chat about a minute after the alert. Inside your cluster. The logs never leave.</p>
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/maxuver/minus20#quickstart">Install in one command</a>
-    <a class="btn" href="https://github.com/maxuver/minus20">GitHub</a>
-    <a class="btn" href="https://github.com/maxuver/minus20/blob/main/docs/BENCHMARKS.md">Benchmarks, including the misses</a>
+<div class="bar"><div class="wrap">
+  <a class="logo" href="#top">minus<b>20</b></a>
+  <nav>
+    <a href="#problem">Problem</a><a href="#message">What you get</a><a href="#agents">Call it</a><a href="#how">How</a><a href="#status">Status</a>
+    <a class="gh" href="https://github.com/maxuver/minus20">GitHub ↗</a>
+  </nav>
+</div></div>
+
+<header class="hero" id="top">
+  <div class="glow"></div>
+  <div class="ghost-num" aria-hidden="true">−20</div>
+  <div class="floor" aria-hidden="true"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>03:00 · KubePodCrashLooping · firing</span>
+      <h1>Minus <span class="amber">twenty minutes</span><br>of not knowing.</h1>
+      <p class="lead">An alert tells you <em>what</em> broke, never <em>why</em>. Minus20 turns the page into a <strong>falsifiable root-cause hypothesis with its evidence</strong>, in your chat, about a minute after the alert. It runs inside your cluster, reads only, and the logs never leave.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/maxuver/minus20#quickstart">Install in one command →</a>
+        <a class="btn" href="https://github.com/maxuver/minus20/blob/main/docs/BENCHMARKS.md">Benchmarks, with the misses</a>
+      </div>
+      <div class="trust"><span>Read-only RBAC</span><span>Redaction before any model</span><span>Local model: $0, no egress</span><span>AGPL, open code</span></div>
+    </div>
+    <div class="scene" aria-hidden="true">
+      <div class="stack">
+        <div class="clock">03:00:00</div>
+        <div class="card3d c-alert">
+          <div class="hd"><span>Alertmanager</span><span>firing</span></div>
+          <div class="t">KubePodCrashLooping</div>
+          <div style="color:var(--muted);font-size:13px;margin-top:4px">pod billing-api · ns minus20 · CrashLoopBackOff</div>
+        </div>
+        <div class="card3d c-evid">
+          <div class="hd"><span>Collected · redacted</span><span>events · logs</span></div>
+          <ul>
+            <li>BackOff restarting failed container</li>
+            <li>Pulled image "busybox" in 887ms</li>
+            <li>ERROR could not connect to postgres:5432</li>
+            <li>+ 2 alerts in the same namespace</li>
+          </ul>
+        </div>
+        <div class="card3d c-hyp">
+          <div class="hd"><span>Likely cause · high</span><span>#4d75d9f6</span></div>
+          <div class="cause">PostgreSQL database outage</div>
+          <div class="kv">disprove: <b>is PostgreSQL up and reachable from billing-api?</b><br>blast radius: cluster · ollama, $0</div>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
-<section>
-  <h2>The 03:00 problem</h2>
-  <p>The page says <code>KubePodCrashLooping</code>. What you actually need is in five places: the pod's events, its previous container's log, the metrics around the restart, what was deployed in the last hour, and what happened last time. Gathering that by hand takes ten to thirty minutes, and it is the same ten to thirty minutes every time. That is the number an engineering manager is paying for, in sleep and in MTTR.</p>
-  <div class="grid">
-    <div class="card"><div class="num-big">39 s</div><p class="muted">Alert fired to hypothesis in chat, measured on a real EKS cluster with a cloud model (2026-09-15).</p></div>
-    <div class="card"><div class="num-big">~2 min</div><p class="muted">The same, on a 7B model on CPU with nothing leaving the cluster. Average 104 s, p95 130 s over a week on the demo cluster.</p></div>
-    <div class="card"><div class="num-big">2 calls</div><p class="muted">Three different alerts in one namespace at once cost two model calls and produce one hypothesis that explains all three.</p></div>
+<section id="problem">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">The 03:00 problem</div>
+      <h2>The page says <span style="font-family:var(--mono);font-size:.8em">CrashLoopBackOff</span>.<br>The answer is in five places.</h2>
+      <p class="sub">Events, the previous container's log, the metrics around the restart, what was deployed in the last hour, and what happened last time. Gathering that by hand takes ten to thirty minutes, every time. That is what an engineering manager pays for, in sleep and in MTTR.</p>
+    </div>
+    <div class="race reveal" id="race">
+      <div class="lane"><div class="who">By hand<small>kubectl, Grafana, Slack history</small></div>
+        <div class="track"><div class="fill manual">describe · logs --previous · PromQL · rollout history · "has this happened before?"</div></div><div class="t" style="color:var(--red)">~20 min</div></div>
+      <div class="lane"><div class="who">Minus20<small>measured, EKS, cloud model</small></div>
+        <div class="track"><div class="fill m20">hypothesis</div></div><div class="t" style="color:var(--amber)">39 s</div></div>
+    </div>
+    <div class="tiles depth">
+      <div class="tile reveal"><div class="n">39<em> s</em></div><p>Alert fired to hypothesis in chat on a real EKS cluster with a cloud model (2026-09-15).</p></div>
+      <div class="tile reveal"><div class="n">~2<em> min</em></div><p>The same on a 7B model on CPU, nothing leaving the cluster: average 104 s, p95 130 s over a week.</p></div>
+      <div class="tile reveal"><div class="n">3→<em>1</em></div><p>Three different alerts in one namespace become one hypothesis that explains all of them, for two model calls.</p></div>
+    </div>
   </div>
 </section>
 
-<section>
-  <h2>What the engineer receives</h2>
-  <p class="muted">Verbatim shape of a message from the demo cluster, 2026-09-17. Three alerts fired in one namespace eight seconds apart.</p>
-  <div class="msg">
-    <div class="row">🔴 <b>KubePodCrashLooping</b> &nbsp;<span class="muted">minus20 · critical</span></div>
-    <div class="row">🔗 <b>Correlated:</b> 3 alerts in this namespace, one cause<br>
-      <code>KubeDeploymentReplicasMismatch pod=billing-api</code> &nbsp; <code>HighErrorRate pod=m20-ingest-api</code><br>
-      <span class="muted">Revised from: PostgreSQL database is unreachable or misconfigured</span></div>
-    <div class="row">🤖 <b>Likely cause</b> <span class="muted">(high confidence)</span><br>PostgreSQL database outage</div>
-    <div class="row">💥 <b>Blast radius:</b> <code>cluster</code></div>
-    <div class="row">📋 <b>Evidence</b><br>• <code>ERROR could not connect to postgres:5432</code><br>• <code>HighErrorRate alert on a different pod</code></div>
-    <div class="row">🎯 <b>Cheapest way to disprove</b><br><em>Check if the PostgreSQL service is up and accessible from the billing-api pod</em></div>
-    <div class="foot">⏱ ollama · 54529 ms · $0.0000 · #4d75d9f6</div>
-  </div>
-  <p>Every message carries the evidence it is based on and the cheapest observation that would prove it wrong, so checking a wrong answer takes seconds. Reply <code>/wrong 4d75d9f6 &lt;real cause&gt;</code> and the next similar incident is answered from what really happened in <em>your</em> cluster; every verdict also becomes a test the benchmark replays against the next model.</p>
-</section>
-
-<section>
-  <h2>How it works</h2>
-  <div class="diagram">Alertmanager ──webhook──► ingest-api ──► Redis Stream ──► analyzer-worker
-                                                          │
-                          collectors: K8s events · pod logs · Prometheus · Loki · CloudWatch
-                                                          │
-                          REDACTION (mandatory: secrets, tokens, e-mails, IPs)
-                                                          │
-                          dedup · storm grouping · correlation · daily budget
-                                                          │
-                          ONE model call, hard timeout  ──► Postgres (audit trail) ──► Slack / Telegram
-
-Engineer in Telegram ──► agent: read-only tools · memory of verdicts (pgvector) · /report
-Any agent CLI      ──► the same tools over MCP</div>
-  <p>Two always-on processes inside your cluster. The <strong>reflex</strong> is a deterministic pipeline: one bounded model call per alert, and the raw alert is delivered even when the model is down, over budget, or wrong. The <strong>agent</strong> answers follow-up questions with a closed set of read-only tools and remembers the engineer's verdicts. Neither holds a tool that can change anything.</p>
-</section>
-
-<section>
-  <h2>Three decisions worth defending</h2>
-  <div class="grid">
-    <div class="card"><h3>Pipeline, not an agent loop, on the alert path</h3><p class="muted">One call, one hypothesis, a hard timeout, a daily budget. Predictable cost (about $0.001 per alert on a cheap cloud model, $0 locally) and an audit trail of exactly what the model saw.</p></div>
-    <div class="card"><h3>It recommends. It never acts.</h3><p class="muted">Read-only credentials. No write tools. Output is text, never executed. The moment an on-call bot can act, every false positive becomes an incident of its own.</p></div>
-    <div class="card"><h3>Privacy first</h3><p class="muted">Redaction runs before any model call and has no off switch. With a local model nothing leaves the cluster. Which model is a config value; the code never changes.</p></div>
+<section id="message">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">What the engineer receives</div>
+      <h2>One message you can check<br>in the time it takes to read it.</h2>
+    </div>
+    <div class="msg-wrap">
+      <div class="phone reveal">
+        <div class="msg" role="img" aria-label="Example Minus20 message">
+          <div class="row">🔴 <b>KubePodCrashLooping</b> <span style="color:var(--muted)">minus20 · critical</span></div>
+          <div class="row">🔗 <b>Correlated:</b> 3 alerts in this namespace, one cause<br><code>KubeDeploymentReplicasMismatch pod=billing-api</code><br><code>HighErrorRate pod=m20-ingest-api</code><br><span style="color:var(--muted)">Revised from: PostgreSQL database is unreachable or misconfigured</span></div>
+          <div class="row">🤖 <b>Likely cause</b> <span style="color:var(--muted)">(high confidence)</span><br>PostgreSQL database outage</div>
+          <div class="row">💥 <b>Blast radius:</b> <code>cluster</code></div>
+          <div class="row">📋 <b>Evidence</b><br>• <code>ERROR could not connect to postgres:5432</code><br>• <code>HighErrorRate alert on a different pod</code></div>
+          <div class="row">🎯 <b>Cheapest way to disprove</b><br><em>Check if the PostgreSQL service is up and accessible from the billing-api pod</em></div>
+          <div class="foot">⏱ ollama · 54529 ms · $0.0000 · #4d75d9f6 · verbatim, demo cluster, 2026-09-17</div>
+        </div>
+      </div>
+      <div class="points reveal">
+        <div class="point"><div class="i">1</div><div><h3>Evidence, not a verdict</h3><p>Every line it relied on is quoted. If the cause is wrong you see why in seconds.</p></div></div>
+        <div class="point"><div class="i">2</div><div><h3>The cheapest way to prove it wrong</h3><p>One command or one query that kills the hypothesis. A guess you can falsify fast is worth more than a confident one you can't.</p></div></div>
+        <div class="point"><div class="i">3</div><div><h3>It learns your cluster from your verdicts</h3><p>Reply <code>/wrong 4d75d9f6 &lt;real cause&gt;</code>. The next similar incident is answered from what really happened, and the verdict becomes a test the benchmark replays against the next model.</p></div></div>
+        <div class="point"><div class="i">4</div><div><h3>The raw alert always arrives</h3><p>Model down, over budget or wrong: the alert is delivered anyway. The AI is an overlay, never a dependency.</p></div></div>
+      </div>
+    </div>
   </div>
 </section>
 
-<section>
-  <h2>Fastest way to see it</h2>
-  <p>One Helm install with the demo switch on: it breaks a pod inside the release namespace under its own write-capable service account, pages itself, and the first real hypothesis is in your chat a few minutes later. The product's service account stays read-only.</p>
-<pre><code>kubectl create namespace minus20
+<section id="agents">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Call it by name</div>
+      <h2>In 2026 the specialists you trust<br>are the ones you can call.</h2>
+      <p class="sub">Engineers keep a list of agents they invoke when a task needs an expert. Minus20 is the on-call one: its read-only tools and the memory of your incidents are served over MCP, so Claude Code, Gemini CLI or Cursor can ask it what happened in this cluster before, and get the engineer's real answer from last time.</p>
+    </div>
+    <div class="agents">
+      <div class="depth reveal">
+        <div class="tree" aria-label="An agents list in an editor">
+          <div class="head">Agents</div>
+          <div class="it dim">Research · papers and methods</div>
+          <div class="it dim">Architect · system design review</div>
+          <div class="it dim">Security · threat model</div>
+          <div class="it me"><span>Minus20</span> · on-call, this cluster</div>
+          <div class="it dim">Finance · cost and budget</div>
+          <div class="it dim">Lawyer · licences and contracts</div>
+        </div>
+      </div>
+      <div class="reveal">
+        <pre class="snippet"><span class="c"># in the cluster: helm ... --set mcp.enabled=true
+# then, from your laptop:</span>
+kubectl -n minus20 port-forward svc/m20-mcp 8765 &amp;
+claude mcp add --transport http minus20 http://localhost:8765/mcp
+
+<span class="c"># and ask, in your own agent:</span>
+"has billing-api crashed before, and what was the real cause?"</pre>
+        <p style="color:var(--muted);margin-top:16px">Eight read-only tools: incidents, memory, events, pod logs (including the previous container), metrics, rollout history, node status. Nothing that can change anything, and the same redaction as the chat.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">How it works</div>
+      <h2>A reflex for the page.<br>An agent for the follow-up.</h2>
+      <p class="sub">Two always-on processes inside your cluster. Neither holds a tool that can change anything.</p>
+    </div>
+    <div class="pipe">
+      <div class="stage reveal" style="--d:-40"><div class="name">Alertmanager → ingest-api</div><div class="what">Webhook validated and queued on a Redis Stream. Nothing else is parsed here.</div></div>
+      <div class="stage reveal" style="--d:-20"><div class="name">collectors</div><div class="what">Kubernetes events, pod logs, Prometheus, Loki, CloudWatch. Fixed set, small caps, bounded windows.</div></div>
+      <div class="stage key reveal" style="--d:0"><div class="name">redaction</div><div class="what">Secrets, tokens, cloud keys, e-mails, IPs masked before any model sees anything. No off switch.</div></div>
+      <div class="stage reveal" style="--d:20"><div class="name">dedup · storm · correlation</div><div class="what">Thirty pods with one alert: one call. Three alerts in one namespace: one revised hypothesis.</div></div>
+      <div class="stage key reveal" style="--d:40"><div class="name">one model call</div><div class="what">Hard timeout, daily budget, the context stored as an audit trail of exactly what the model saw.</div></div>
+      <div class="stage reveal" style="--d:60"><div class="name">Slack · Telegram · MCP</div><div class="what">The message above. Then ask follow-ups in the chat, or from your own agent.</div></div>
+    </div>
+    <div class="three">
+      <div class="tile reveal"><h3>A pipeline, not an agent loop</h3><p>One bounded call per alert, predictable cost: about $0.001 on a cheap cloud model, $0 locally.</p></div>
+      <div class="tile reveal"><h3>It recommends. It never acts.</h3><p>Read-only credentials, no write tools, output is text and never executed. An on-call bot that can act turns every false positive into an incident.</p></div>
+      <div class="tile reveal"><h3>Which model is a setting</h3><p>Local Ollama, Mistral, DeepSeek, Gemini, anything OpenAI-compatible; local-first with a cloud fallback. The code never changes.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Fastest way to see it</div>
+      <h2>Install, and it pages itself.</h2>
+      <p class="sub">With the demo switch on, a Job breaks one pod in the release namespace (under its own service account; the product's stays read-only) and the first real hypothesis lands in your chat minutes after the images are pulled.</p>
+    </div>
+<pre class="install reveal"><code>kubectl create namespace minus20
 kubectl -n minus20 create secret generic m20-telegram --from-literal=bot-token='&lt;token&gt;'
 helm install m20 oci://ghcr.io/maxuver/charts/minus20 -n minus20 \
   --set config.notifier=telegram --set config.telegramChatId=&lt;your chat id&gt; \
   --set config.llmProvider=ollama --set config.ollamaUrl=http://&lt;ollama&gt;:11434 \
   --set demo.chaos.enabled=true</code></pre>
-  <p class="muted">No Ollama? Any OpenAI-compatible key works (Mistral, DeepSeek, Gemini): <code>--set config.llmProvider=openai --set config.openaiBaseUrl=...</code>. Images are signed (SLSA provenance, verify with <code>gh attestation verify</code>), scanned, and ship an SBOM.</p>
+    <p class="reveal" style="color:var(--muted)">No Ollama? Any OpenAI-compatible key: <code>--set config.llmProvider=openai --set config.openaiBaseUrl=https://api.mistral.ai/v1</code>. Images are multi-arch, signed with SLSA provenance (<code>gh attestation verify</code>), scanned by Trivy and shipped with an SBOM. Already running it? Paste <code>kubectl describe pod</code> into the bot and get the same message without an alert.</p>
+  </div>
 </section>
 
-<section>
-  <h2>Where it stands</h2>
-  <table>
-    <tr><th>Shipped</th><th>Proof</th></tr>
-    <tr><td>Reflex pipeline: collectors, redaction, dedup, storm grouping, cross-alert correlation, graceful degradation</td><td class="ok">two real EKS runs, destroyed the same session; live on kind daily</td></tr>
-    <tr><td>Agent in Telegram with read-only tools, memory of verdicts, weekly review, screenshots via a local vision model</td><td class="ok">ADR-0005, 190 tests</td></tr>
-    <tr><td>The same tools over MCP for Gemini CLI, Claude Code, Cursor</td><td class="ok">live</td></tr>
-    <tr><td>Benchmark: 6 easy scenarios, 10 hard ones, graded on the stated cause only</td><td class="ok">7B local: easy 6/6, hard 6/10 · cloud: easy 6/6, hard 6 of 7 served</td></tr>
-    <tr><td>Verdicts become the eval set (<code>replay --from-store</code>)</td><td class="ok">first run 2/3, one false pass found and fixed</td></tr>
-    <tr><td>Helm chart (OCI), signed multi-arch images, Terraform for EKS</td><td class="ok">CI: lint, tests, Trivy, gitleaks, provenance, SBOM</td></tr>
-    <tr><th>Not yet</th><th></th></tr>
-    <tr><td>Topology-aware correlation (owner references, service graph); ranked hypotheses; OpenSearch collector; a public paste-and-ask bot</td><td class="warn">roadmap</td></tr>
-    <tr><td>Auto-remediation</td><td class="warn">never in the open version</td></tr>
-  </table>
-  <p class="muted">The numbers above are measured and published with the misses. Nothing here has been measured against someone else's production incidents yet; the eval set grows from real verdicts for exactly that reason.</p>
+<section id="status">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Where it stands</div>
+      <h2>Measured, and published with the misses.</h2>
+    </div>
+    <div class="scroll-x reveal">
+      <table>
+        <tr><th>Shipped</th><th>Proof</th></tr>
+        <tr><td>Reflex pipeline: collectors, redaction, dedup, storm grouping, cross-alert correlation, graceful degradation</td><td class="ok">two real EKS runs, destroyed the same session; live daily on kind</td></tr>
+        <tr><td>Agent in Telegram: read-only tools, memory of verdicts, weekly review that sends itself, screenshots and pasted kubectl output</td><td class="ok">ADRs 0005-0006, 193 tests</td></tr>
+        <tr><td>The same tools over MCP for Claude Code, Gemini CLI, Cursor</td><td class="ok">live</td></tr>
+        <tr><td>Benchmark: 6 easy, 10 hard scenarios (3 AWS-specific), graded on the stated cause only</td><td class="ok">7B local: easy 6/6, hard 6/10 · cloud: easy 6/6, hard 6 of 7 served</td></tr>
+        <tr><td>Engineer verdicts become the eval set (<code>replay --from-store</code>)</td><td class="ok">first run 2/3; one false pass found and fixed</td></tr>
+        <tr><td>Helm chart (OCI), signed multi-arch images, Terraform for EKS</td><td class="ok">CI: tests, Trivy, gitleaks, provenance, SBOM</td></tr>
+        <tr><th>Not yet</th><th></th></tr>
+        <tr><td>Topology-aware correlation, ranked hypotheses, OpenSearch collector, a public paste-and-ask bot</td><td class="no">roadmap</td></tr>
+        <tr><td>Auto-remediation</td><td class="no">never in the open version</td></tr>
+      </table>
+    </div>
+    <p class="reveal" style="color:var(--dim);font-size:14px;margin-top:18px">Nothing here has been measured on someone else's production incidents yet. That is why the eval set grows from real verdicts, and why the benchmark page lists every miss.</p>
+  </div>
 </section>
 
 <footer>
-  <span class="tag">AGPL-3.0 + commercial licence</span><span class="tag">Any Kubernetes</span><span class="tag">Formerly SentinelOps</span>
-  <p><a href="https://github.com/maxuver/minus20">github.com/maxuver/minus20</a> · Built by Maxim Patsyuk. Where AWS DevOps Agent can't be used: logs that must stay in the cluster, clusters not on AWS, a price known in advance, open code.</p>
+  <div class="wrap">
+    <div class="big">Where AWS DevOps Agent can't be used.</div>
+    <p>Logs that must stay in the cluster, clusters not on AWS, a price known in advance, code you can read.</p>
+    <p><span class="tag">AGPL-3.0 + commercial licence</span><span class="tag">any Kubernetes</span><span class="tag">formerly SentinelOps</span></p>
+    <p><a href="https://github.com/maxuver/minus20">github.com/maxuver/minus20</a> · built by Maxim Patsyuk</p>
+  </div>
 </footer>
 
-</main>
+<script>
+(() => {
+  const root = document.documentElement;
+  // ?static renders everything at once, no motion (full-page screenshots, print)
+  if (location.search.includes("static")) return;
+  root.classList.add("js");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // reveal on enter
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+  }, { threshold: 0.18 });
+  document.querySelectorAll(".reveal, #race").forEach((el) => io.observe(el));
+  if (reduce) return;
+  // parallax: scroll depth and pointer tilt, written as CSS variables once per frame
+  let sy = 0, mx = 0, my = 0, tmx = 0, tmy = 0, queued = false;
+  const frame = () => {
+    queued = false;
+    mx += (tmx - mx) * 0.12; my += (tmy - my) * 0.12;
+    root.style.setProperty("--sy", sy.toFixed(1));
+    root.style.setProperty("--p", Math.min(sy / 520, 1).toFixed(3));
+    root.style.setProperty("--mx", mx.toFixed(3));
+    root.style.setProperty("--my", my.toFixed(3));
+    if (Math.abs(tmx - mx) > 0.002 || Math.abs(tmy - my) > 0.002) request();
+  };
+  const request = () => { if (!queued) { queued = true; requestAnimationFrame(frame); } };
+  addEventListener("scroll", () => { sy = scrollY; request(); }, { passive: true });
+  addEventListener("pointermove", (e) => {
+    if (e.pointerType === "touch") return;
+    tmx = (e.clientX / innerWidth) * 2 - 1; tmy = (e.clientY / innerHeight) * 2 - 1; request();
+  }, { passive: true });
+  request();
+})();
+</script>
 </body>
 </html>

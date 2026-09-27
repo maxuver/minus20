@@ -388,7 +388,7 @@ filename → markdown.
 
 ## Use it from your own agent (MCP)
 
-The seven read-only tools are also served over the Model Context Protocol, so
+The eight read-only tools are also served over the Model Context Protocol, so
 an agent you already use can ask Minus20 what happened in this cluster
 before. Nothing new is exposed and nothing can be changed: it is the agent's
 closed registry, annotated read-only, behind the same redaction.

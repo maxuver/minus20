@@ -1035,3 +1035,19 @@ async def test_public_trial_serves_strangers_paste_only_with_a_daily_cap():  # C
     assert "allows 2 a day" in capped.text
     # the owner is unaffected by the cap
     assert "Likely cause" in (await bot.handle(_update(42, DESCRIBE))).text
+
+
+async def test_a_long_message_is_one_request_never_a_fan_out():  # CC-64
+    """Seen live 2026-09-27: a 60-line paste to a bot without paste mode ran the
+    agent once per line and sent a reply per line."""
+    chat = FakeChat([ChatTurn(content="one answer")])
+    bot, sent = _bot(chat=chat)  # no reflex: paste mode unavailable
+    lines = "\n".join(f"line {i} of some log output" for i in range(60))
+    await bot.handle(_update(42, lines))
+    assert len(chat.requests) == 1 and len(sent) == 1
+    # two short requests in one message are still both answered
+    chat2 = FakeChat([ChatTurn(content="a"), ChatTurn(content="b")])
+    bot2, sent2 = _bot(chat=chat2)
+    await bot2.handle(_update(42, "why is billing-api down?\nand what changed in payments?"))
+    assert len(sent2) == 2
+

@@ -64,6 +64,7 @@ MAX_MESSAGE = 3_900  # Telegram caps at 4096; leave room for tags
 HISTORY_TURNS = 3  # user+assistant pairs kept per chat for follow-up questions
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 NO_ARG_COMMANDS = ("/start", "/help", "/status", "/index")
+MAX_SEGMENTS = 3  # '/status' + a question is two; a pasted log is one request, not sixty
 
 TRANSCRIBE_PROMPT = (
     "This is a screenshot an on-call engineer sent about a production problem. "
@@ -230,8 +231,13 @@ class TelegramBot:
                 # One message may carry several requests ("/status" then a
                 # question on the next line, or "/status why is x down?").
                 # Each is answered; before, only the first command was.
-                # A paste is one request, however many lines it has.
+                # A paste is one request, however many lines it has. And a long
+                # message is never fanned out: on 2026-09-27 a 60-line kubectl
+                # describe sent to a bot without paste mode became 60 agent runs
+                # and a stream of replies. More than MAX_SEGMENTS lines = one request.
                 segments = [text] if (self._reflex is not None and looks_like_paste(text)) else self._segments(text)
+                if len(segments) > MAX_SEGMENTS:
+                    segments = [text]
                 for segment in segments:
                     reply = await self.dispatch(chat_id, segment)
                     await self._send(chat_id, reply)

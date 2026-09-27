@@ -150,10 +150,12 @@ class Chaos:
         return name
 
 
-async def _http_post(url: str, payload: dict[str, Any], attempts: int = 6, delay: float = 10.0) -> None:  # pragma: no cover - real network
-    """Right after `helm install` ingest-api may still be starting; wait for it."""
+async def _http_post(url: str, payload: dict[str, Any], delay: float = 10.0) -> None:  # pragma: no cover - real network
+    """Right after `helm install` ingest-api may still be pulling its image; wait for it
+    (MINUS20_CHAOS_INGEST_WAIT_SECONDS, default 60)."""
     import httpx
 
+    attempts = max(1, int(float(os.environ.get("MINUS20_CHAOS_INGEST_WAIT_SECONDS", "60")) // delay))
     async with httpx.AsyncClient(timeout=10.0) as client:
         for attempt in range(1, attempts + 1):
             try:
@@ -163,7 +165,8 @@ async def _http_post(url: str, payload: dict[str, Any], attempts: int = 6, delay
             except (httpx.HTTPError, OSError) as exc:
                 if attempt == attempts:
                     raise
-                logger.info("chaos: ingest not ready (%s); retry %d/%d in %.0fs", exc.__class__.__name__, attempt, attempts, delay)
+                if attempt == 1 or attempt % 6 == 0:
+                    logger.info("chaos: ingest not ready (%s); retry %d/%d every %.0fs", exc.__class__.__name__, attempt, attempts, delay)
                 await asyncio.sleep(delay)
 
 

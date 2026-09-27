@@ -90,22 +90,22 @@ spec:
 {{- if .Values.demo.chaos.runOnInstall }}
 ---
 # One run right after install/upgrade: the first hypothesis arrives without
-# waiting for the schedule. Helm deletes the previous hook Job before creating
-# this one, and the finished Job after it succeeds.
+# waiting for the schedule. Deliberately NOT a Helm hook: a hook blocks
+# `helm install` until it finishes, and on a slow link (first image pulls
+# took 14+ minutes on 2026-09-27) it failed the whole install. A plain Job
+# returns control at once and waits for ingest-api itself. The revision in
+# the name gives every install/upgrade its own run; finished Jobs clean up.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-chaos-first-run
+  name: {{ .Release.Name }}-chaos-first-run-{{ .Release.Revision }}
   labels:
     {{- include "minus20.labels" . | nindent 4 }}
     app.kubernetes.io/component: chaos
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "10"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 2
-  activeDeadlineSeconds: 600
+  activeDeadlineSeconds: 2400
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
@@ -126,6 +126,9 @@ spec:
               value: {{ .Release.Namespace | quote }}
             - name: MINUS20_CHAOS_INGEST_URL
               value: "http://{{ .Release.Name }}-ingest-api:8080/webhook/alertmanager"
+            # First install pulls every image; give ingest-api up to 20 min.
+            - name: MINUS20_CHAOS_INGEST_WAIT_SECONDS
+              value: "1200"
           resources:
             requests:
               cpu: 10m
