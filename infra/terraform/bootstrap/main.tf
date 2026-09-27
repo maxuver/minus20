@@ -3,10 +3,9 @@
 # bucket. Terraform >= 1.10 locks state natively in S3 (`use_lockfile`), so no
 # DynamoDB table is needed any more.
 #
-# The bucket name keeps the project's previous name (sentinelops): S3 buckets
-# cannot be renamed and the live state sits in it. Changing the prefix here
-# would make Terraform replace the bucket. New users get whatever prefix they
-# set; the name is an identifier, not the brand.
+# S3 bucket names cannot be changed in place: once created, keep passing the
+# same `bucket_prefix`, or Terraform plans to replace the bucket that holds
+# the state.
 #
 #   cd infra/terraform/bootstrap
 #   AWS_PROFILE=minus20 terraform init && terraform apply
@@ -43,9 +42,15 @@ resource "random_id" "suffix" {
   byte_length = 3
 }
 
+variable "bucket_prefix" {
+  description = "Prefix of the state bucket name; a random suffix is appended."
+  type        = string
+  default     = "minus20-tfstate"
+}
+
 resource "aws_s3_bucket" "state" {
-  bucket = "sentinelops-tfstate-${random_id.suffix.hex}"
-  tags   = { Project = "sentinelops", Purpose = "terraform-state" }
+  bucket = "${var.bucket_prefix}-${random_id.suffix.hex}"
+  tags   = { Project = "minus20", Purpose = "terraform-state" }
 }
 
 resource "aws_s3_bucket_versioning" "state" {

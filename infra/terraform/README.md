@@ -95,7 +95,7 @@ attribute in clear text, which is why it is never local and never committed.
 
 ## Credentials and IAM (what this run used, and what it should use)
 
-The first real run used an IAM user (`sentinelops-terraform`, created before the rename) with
+The first real run used a dedicated IAM user with
 `AdministratorAccess` and a long-lived access key, configured as a named
 profile (`aws configure --profile minus20`, passed as `-var
 aws_profile=minus20`; the provider never sees a key). Stated plainly

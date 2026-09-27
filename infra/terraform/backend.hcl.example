@@ -1,7 +1,6 @@
-# Copy to backend.hcl (gitignored) and fill in the bucket from bootstrap/
-# (the bucket prefix predates the rename to Minus20; see bootstrap/main.tf):
+# Copy to backend.hcl (gitignored) and fill in the bucket from bootstrap/:
 #   terraform -chdir=bootstrap output -raw backend_hcl > backend.hcl
-bucket       = "sentinelops-tfstate-xxxxxx"
+bucket       = "minus20-tfstate-xxxxxx"
 key          = "eks/terraform.tfstate"
 region       = "eu-central-1"
 use_lockfile = true

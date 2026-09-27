@@ -1,9 +1,7 @@
 # Real runs on AWS EKS
 
-> Recorded under the project's previous name, SentinelOps (renamed Minus20 on
-> 2026-09-17). Commands, resource names and outputs below are verbatim as run;
-> the chart is now `oci://ghcr.io/maxuver/charts/minus20` and the environment
-> prefix is `MINUS20_`.
+> Resource names below follow the project's current naming. Timings, resource
+> counts, costs, versions and outputs are as recorded on the day.
 
 ## Run 1 — 2026-09-13: infrastructure and the reflex path
 
@@ -20,7 +18,7 @@ masked.
 |---|---|
 | 12:11:09 | `terraform apply` started (62 resources planned, 0 to change) |
 | 12:24:17 | `Apply complete! Resources: 62 added` — 13 min 8 s |
-| 12:25:01 | `helm upgrade --install so oci://ghcr.io/maxuver/charts/sentinelops` — `Pulled: …:0.4.0`, `STATUS: deployed` |
+| 12:25:01 | `helm upgrade --install m20 oci://ghcr.io/maxuver/charts/minus20` — `Pulled: …:0.4.0`, `STATUS: deployed` |
 | ~12:29 | crash-looping pod injected, alert posted, `status=analyzed` in the worker log |
 | 12:29:04 | `helm uninstall`, `terraform destroy` started |
 | 12:42:02 | `Destroy complete! Resources: 62 destroyed.` — 12 min 58 s |
@@ -30,7 +28,7 @@ masked.
 
 ```
 $ terraform output
-cluster_name     = "sentinelops"
+cluster_name     = "minus20"
 cluster_endpoint = "https://<id>.gr7.eu-central-1.eks.amazonaws.com"
 region           = "eu-central-1"
 
@@ -50,29 +48,29 @@ Two `t3.small` SPOT nodes in private subnets, one NAT gateway, EKS 1.36
 ### What ran on it
 
 ```
-$ helm upgrade --install so oci://ghcr.io/maxuver/charts/sentinelops -n sentinelops --create-namespace
-Pulled: ghcr.io/maxuver/charts/sentinelops:0.4.0
+$ helm upgrade --install m20 oci://ghcr.io/maxuver/charts/minus20 -n minus20 --create-namespace
+Pulled: ghcr.io/maxuver/charts/minus20:0.4.0
 STATUS: deployed
 
-$ kubectl -n sentinelops get pods
-so-analyzer-worker-5c7c5649c8-895nc   1/1   Running
-so-ingest-api-6b8bb66556-lfnbr        1/1   Running
-so-redis-59c86b58cc-mjtln             1/1   Running
+$ kubectl -n minus20 get pods
+m20-analyzer-worker-5c7c5649c8-895nc   1/1   Running
+m20-ingest-api-6b8bb66556-lfnbr        1/1   Running
+m20-redis-59c86b58cc-mjtln             1/1   Running
 ```
 
 ### The incident
 
 ```
-$ kubectl -n sentinelops run billing-api --image=busybox --restart=Always --command -- \
+$ kubectl -n minus20 run billing-api --image=busybox --restart=Always --command -- \
     sh -c "echo 'ERROR could not connect to postgres:5432'; sleep 2; exit 1"
 
-$ kubectl -n sentinelops get events --field-selector involvedObject.name=billing-api
+$ kubectl -n minus20 get events --field-selector involvedObject.name=billing-api
 Warning   BackOff   pod/billing-api   Back-off restarting failed container billing-api in pod billing-api_…
 
-$ curl -X POST localhost:18080/webhook/alertmanager -d @alert.json     # via port-forward to so-ingest-api
+$ curl -X POST localhost:18080/webhook/alertmanager -d @alert.json     # via port-forward to m20-ingest-api
 {"queued":1}
 
-$ kubectl -n sentinelops logs deploy/so-analyzer-worker
+$ kubectl -n minus20 logs deploy/m20-analyzer-worker
 incident alert=KubePodCrashLooping status=analyzed backend=stub latency=1ms cost=$0.000000 cause='stub backend: …'
 ```
 
@@ -85,7 +83,7 @@ proven separately on kind (see `docs/BENCHMARKS.md`).
 ### RBAC on the real cluster
 
 ```
-$ sa=system:serviceaccount:sentinelops:so-analyzer
+$ sa=system:serviceaccount:minus20:m20-analyzer
 $ kubectl auth can-i list events      --as=$sa -A   # yes
 $ kubectl auth can-i get pods/log     --as=$sa -A   # yes
 $ kubectl auth can-i list secrets     --as=$sa -A   # no
@@ -149,7 +147,7 @@ new `k8s-logs` collector.
 |---|---|
 | 20:41:17 | `terraform apply` (69 resources: run 1's 62, plus the EBS CSI driver, its Pod Identity role and the pod-identity agent) |
 | 20:53:13 | `Apply complete` — 11 min 56 s |
-| 20:54 | `helm upgrade --install so oci://ghcr.io/maxuver/charts/sentinelops` — `Pulled: …:0.7.0`, with `config.store=postgres`, `webUi.enabled=true`, `mcp.enabled=true` |
+| 20:54 | `helm upgrade --install m20 oci://ghcr.io/maxuver/charts/minus20` — `Pulled: …:0.7.0`, with `config.store=postgres`, `webUi.enabled=true`, `mcp.enabled=true` |
 | 20:55–21:00 | Postgres PVC `Pending` again, for a different reason (below); fixed live; volume bound, Postgres `Running` |
 | 21:02 | crash-looping pod injected, alert posted: `status=analyzed`, **38.9 s from the alert firing to the hypothesis**, context of 1152 chars stored in Postgres on EBS |
 | 21:03 | MCP over HTTP from the laptop: `node_status`, `pod_logs`, `recent_incidents` answered from the cloud cluster |
@@ -161,8 +159,8 @@ new `k8s-logs` collector.
 
 ```
 ## Kubernetes events
-Warning BackOff pod/billing-api x2: Back-off restarting failed container billing-api in pod billing-api_sentinelops(…)
-Normal Scheduled pod/billing-api: Successfully assigned sentinelops/billing-api to ip-10-0-x-x…
+Warning BackOff pod/billing-api x2: Back-off restarting failed container billing-api in pod billing-api_minus20(…)
+Normal Scheduled pod/billing-api: Successfully assigned minus20/billing-api to ip-10-0-x-x…
 ## Logs
 --- previous container (billing-api)
 ERROR could not connect to postgres:5432
@@ -175,14 +173,14 @@ model is measured in `docs/BENCHMARKS.md`), so the point of the row is the
 context and the clocks, not the hypothesis text.
 
 ```
-$ kubectl -n sentinelops get pvc so-postgres
-so-postgres   Bound   pvc-a3b1baa2-…   2Gi   gp2
+$ kubectl -n minus20 get pvc m20-postgres
+m20-postgres   Bound   pvc-a3b1baa2-…   2Gi   gp2
 
-$ MCP client → http://localhost:18765/mcp (port-forward to so-mcp on EKS)
+$ MCP client → http://localhost:18765/mcp (port-forward to m20-mcp on EKS)
 tools: 8
 [node_status] ip-10-0-x-x…: Ready=True allocatable cpu=1930m memory=1468156Ki pods=11 kubelet=v1.36.3-eks-cb19647 / …
 [pod_logs] ERROR could not connect to postgres:5432 / --- previous container …
-[recent_incidents] #070d7b06 2026-09-14 21:02 KubePodCrashLooping ns=sentinelops sev=warning status=analyzed: …
+[recent_incidents] #070d7b06 2026-09-14 21:02 KubePodCrashLooping ns=minus20 sev=warning status=analyzed: …
 ```
 
 ### What went wrong this time, and what changed
