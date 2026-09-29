@@ -15,8 +15,9 @@ It never acts on your cluster. It recommends; the engineer decides.
 
 **Try it without installing:** paste the output of `kubectl describe pod`
 or `kubectl logs` into the bot and get the same message the installed
-product sends after an alert. Owners of any Minus20 bot have this today; a
-public trial bot follows once the demo cluster has a permanent home.
+product sends after an alert. Owners of any Minus20 bot have this today. A public demo bot runs on a
+small always-on server; opening it to everyone waits on its hosted model
+(see Known limitations).
 
 ---
 
@@ -64,7 +65,12 @@ From a checkout, `deploy/minus20` works in place of the OCI reference.
 No cluster handy? `kind create cluster --config kind/cluster.yaml` gives you one
 in a minute.
 
-Break something on purpose and watch it work:
+Fastest first hypothesis: add `--set demo.chaos.enabled=true` and the chart
+breaks one pod in its own namespace right after install (under its own
+service account; the product's stays read-only). Measured on a fresh 2 vCPU /
+4 GB server: 35 s from `helm install` to the first hypothesis.
+
+Or break something yourself and watch it work:
 
 ```bash
 kubectl -n minus20 run billing-api --image=busybox --command -- \
@@ -163,12 +169,13 @@ helm upgrade --install m20 deploy/minus20 -n minus20 \
 | Delivery — Slack, Telegram | ✅ |
 | Incident history — Postgres, with the redacted context each hypothesis was based on (audit trail) | ✅ |
 | Read-only web UI for the incident history | ✅ |
-| Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report` (on demand and on a weekly schedule), screenshots via a local vision model | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
+| Agent in Telegram — read-only tools, memory of past incidents (pgvector), `/report` (on demand and on a weekly schedule), screenshots via a local vision model, pasted `kubectl` output answered like an alert | ✅ ([ADR-0005](docs/adr/0005-reflex-and-deliberate-agent.md)) |
 | Unattended demo — a CronJob that breaks a pod on a schedule and pages the reflex, under its own write-capable ServiceAccount; the product stays read-only | ✅ `demo.chaos.enabled` |
 | MCP server — the same read-only tools for Gemini CLI, Claude Code, Cursor | ✅ |
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark; the eval set grows from real incidents with an engineer's verdict (`replay --from-store`) | ✅ [results](docs/BENCHMARKS.md) |
 | CI — lint, tests, container build + CVE scan, helm lint, SAST, dependency scan, secret scan of full history, signed provenance + SBOM per image | ✅ |
+| Always-on demo — single-node k3s on a 2 vCPU / 4 GB VPS, SSH by key only, nothing but port 22 reachable | ✅ cold `helm install` from GHCR → first hypothesis in 35 s, 1.3 GB RAM in use (2026-09-27) |
 | Terraform for AWS EKS | ✅ two real runs (2026-09-13/14): chart from GHCR, Postgres on EBS, MCP, real incidents, destroyed the same session, ~$0.13 each at list price — [proof](docs/EKS-RUN.md) |
 
 ### Known limitations
@@ -179,11 +186,16 @@ Stated plainly, because you will find them anyway:
   ClusterIP on purpose; reach it with `kubectl port-forward`, do not expose it.
 - **No multi-tenancy.** Single team, single cluster.
 - **Accuracy depends on the model, and it is measured.** With the local 7B
-  model: 6/6 on plainly-stated scenarios, 5/7 on scenarios built to mislead.
-  With a current cloud model through the same pipeline: 6/6 and 5/5, in 7 s.
+  model: 6/6 on plainly-stated scenarios, 6/10 on scenarios built to mislead
+  (three of them AWS-specific). With a current cloud model through the same
+  pipeline: 6/6, and every hard scenario it was served, in about 7 s.
   Method and case-by-case results: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
   Nothing has been measured against real production incidents yet.
 - **Kubernetes only.** No other alert sources yet.
+- **Free cloud model tiers are not a foundation.** In September 2026 one ran
+  out of daily quota, one needed plan activation its console could not load,
+  one refused our region. The alert still arrives when the model does not
+  answer (that is tested); for real use run the local model or a paid key.
 - **The agent is slow on CPU.** With a local 7B model a multi-step question
   takes minutes (measured: 8 min for four tool calls); a cloud model takes
   seconds. The reflex path is unaffected.
