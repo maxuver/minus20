@@ -11,7 +11,7 @@ CC-47 On a fresh install the incidents table does not exist yet. The page
       that table only when it stores its first incident.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
@@ -35,7 +35,7 @@ ROW = {
     "cost_usd": 0.0,
     "latency_ms": 1420,
     "failure_reason": None,
-    "created_at": datetime(2026, 9, 2, 14, 30, tzinfo=timezone.utc),
+    "created_at": datetime(2026, 9, 2, 14, 30, tzinfo=UTC),
 }
 
 FAILED_ROW = {

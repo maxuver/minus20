@@ -15,7 +15,7 @@ import base64
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from html import escape
 from typing import Any
 
@@ -76,7 +76,7 @@ TRANSCRIBE_PROMPT = (
 
 def next_report_at(now: datetime, weekday: int, hour_utc: int) -> datetime:
     """The next `weekday` (Monday=0) at `hour_utc`:00 UTC strictly after `now`."""
-    now = now.astimezone(timezone.utc)
+    now = now.astimezone(UTC)
     candidate = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
     days_ahead = (weekday - now.weekday()) % 7
     candidate += timedelta(days=days_ahead)
@@ -164,7 +164,7 @@ class TelegramBot:
         except Exception as exc:  # noqa: BLE001 - cosmetic; the answer still arrives
             logger.debug("typing indicator failed: %s", exc)
 
-    async def report_loop(self, sleep=asyncio.sleep, now=lambda: datetime.now(timezone.utc)) -> None:
+    async def report_loop(self, sleep=asyncio.sleep, now=lambda: datetime.now(UTC)) -> None:
         """Send the weekly review to every allowed chat on schedule, forever.
 
         Off unless MINUS20_AGENT_REPORT_WEEKDAY is set. Sleeps until the next
@@ -263,7 +263,7 @@ class TelegramBot:
             reply = Reply(TRIAL_HELP)
             await self._send(chat_id, reply)
             return reply
-        day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        day = datetime.now(UTC).strftime("%Y-%m-%d")
         used = self._trial_used.get((chat_id, day), 0)
         if used >= self._cfg.agent_public_daily_limit:
             reply = Reply(f"That is {used} today; the trial allows {self._cfg.agent_public_daily_limit} a day. "

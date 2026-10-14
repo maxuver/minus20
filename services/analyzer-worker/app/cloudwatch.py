@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .models import ContextBundle, StreamAlert
@@ -32,8 +32,8 @@ logger = logging.getLogger("analyzer-worker.cloudwatch")
 
 
 def _alert_time(alert: StreamAlert) -> datetime:
-    t = alert.startsAt or datetime.now(timezone.utc)
-    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+    t = alert.startsAt or datetime.now(UTC)
+    return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
 class CloudWatchLogsCollector:

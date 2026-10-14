@@ -12,6 +12,7 @@ CC-19 Cost from the backend is recorded on the incident.
 """
 
 import asyncio
+from datetime import UTC
 
 from app.analyzer import Analyzer
 from app.budget import InMemoryBudget
@@ -181,7 +182,7 @@ async def test_incident_records_the_redacted_context_the_model_saw():
 
 
 async def test_incident_records_time_from_alert_firing_to_hypothesis():
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.analyzer import Analyzer
     from app.backends import StubBackend
@@ -191,7 +192,7 @@ async def test_incident_records_time_from_alert_firing_to_hypothesis():
     from app.notifiers import StubNotifier
     from app.stores import InMemoryStore
 
-    fired = datetime.now(timezone.utc) - timedelta(seconds=90)
+    fired = datetime.now(UTC) - timedelta(seconds=90)
     analyzer = Analyzer(collector=StubCollector(), backend=StubBackend(), notifier=StubNotifier(), store=InMemoryStore(), budget=InMemoryBudget(1.0))
     inc = await analyzer.analyze(StreamAlert(labels={"alertname": "X"}, startsAt=fired))
     assert 89_000 <= inc.time_to_hypothesis_ms <= 95_000  # ~90 s from firing, not the 1 ms model call

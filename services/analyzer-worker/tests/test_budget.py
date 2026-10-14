@@ -4,7 +4,7 @@ CC-4  (see test_analyzer) the pipeline skips the LLM when budget is gone.
 CC-5  The counter is dated (UTC), so it resets each day on its own.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import fakeredis.aioredis
 
@@ -22,7 +22,7 @@ async def test_inmemory_budget_flips_at_cap():
 async def test_inmemory_budget_is_dated():  # CC-5
     budget = InMemoryBudget(cap_usd=1.0)
     await budget.add(0.5)
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     assert any(today in key for key in budget._spent)
 
 

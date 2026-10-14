@@ -16,7 +16,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ..collectors import K8sEventsCollector, LokiCollector, PrometheusCollector
@@ -107,7 +107,7 @@ async def recent_incidents(
         return "incident history unavailable (store is not postgres)"
     hours = max(1, min(int(hours), 24 * 90))
     limit = max(1, min(int(limit), 50))
-    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    since = datetime.now(UTC) - timedelta(hours=hours)
     async with ctx.pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT id, alertname, namespace, severity, status, root_cause, confidence, "
@@ -179,7 +179,7 @@ def _synthetic_alert(namespace: str, pod: str | None) -> StreamAlert:
     labels = {"namespace": namespace}
     if pod:
         labels["pod"] = pod
-    return StreamAlert(labels=labels, startsAt=datetime.now(timezone.utc))
+    return StreamAlert(labels=labels, startsAt=datetime.now(UTC))
 
 
 async def k8s_events(ctx: ToolContext, namespace: str, pod: str | None = None) -> str:
@@ -261,7 +261,7 @@ async def node_status(ctx: ToolContext) -> str:
     try:
         events = await api.list_event_for_all_namespaces(field_selector="involvedObject.kind=Node")
         warnings = [e for e in events.items if e.type == "Warning"]
-        warnings.sort(key=lambda e: (e.last_timestamp or e.event_time or datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+        warnings.sort(key=lambda e: (e.last_timestamp or e.event_time or datetime.min.replace(tzinfo=UTC)), reverse=True)
         for e in warnings[: ctx.cfg.k8s_max_events]:
             lines.append(f"event {e.reason} node/{getattr(e.involved_object, 'name', '')}: {e.message}")
     except Exception as exc:  # noqa: BLE001 - events are a bonus here
@@ -272,7 +272,7 @@ async def node_status(ctx: ToolContext) -> str:
 async def deploy_history(ctx: ToolContext, namespace: str, hours: int = 24) -> str:
     """What changed: every ReplicaSet created in the window is a rollout."""
     hours = max(1, min(int(hours), 24 * 30))
-    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    since = datetime.now(UTC) - timedelta(hours=hours)
     api = await ctx.apps_api()
     resp = await api.list_namespaced_replica_set(namespace)
     rows = []

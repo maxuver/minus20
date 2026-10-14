@@ -11,13 +11,13 @@ with no scheduler.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .config import Settings, settings
 
 
 def _today_key(prefix: str) -> str:
-    return f"{prefix}:{datetime.now(timezone.utc).date().isoformat()}"
+    return f"{prefix}:{datetime.now(UTC).date().isoformat()}"
 
 
 class InMemoryBudget:

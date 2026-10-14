@@ -22,7 +22,7 @@ CC-59  The weekly review sends itself on schedule to every allowed chat, and
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -93,7 +93,7 @@ class FakeConn:
             for r in self.store.incidents:
                 if r["id"].startswith(args[0].rstrip("%")):
                     r["verdict"], r["resolution"] = args[1], args[2]
-                    r["resolved_at"] = datetime.now(timezone.utc)
+                    r["resolved_at"] = datetime.now(UTC)
                     return {"id": r["id"]}
             return None
         if "count(*)" in sql:
@@ -162,7 +162,7 @@ def _incident(**over):
         "disproof": "check the db is up",
         "next_steps": ["look at db"],
         "backend": "ollama",
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "verdict": None,
         "resolution": None,
         "resolved_at": None,
@@ -227,7 +227,7 @@ async def test_history_tools_degrade_without_postgres():
 
 
 async def test_deploy_history_lists_rollouts_in_window():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     def rs(name, owner, image, age_h):
         return SimpleNamespace(
@@ -515,7 +515,7 @@ async def test_report_renders_from_sql_without_a_model():
 
 
 def test_report_handles_an_empty_period():
-    data = ReportData(period_start=datetime(2026, 9, 1, tzinfo=timezone.utc), period_end=datetime(2026, 9, 8, tzinfo=timezone.utc))
+    data = ReportData(period_start=datetime(2026, 9, 1, tzinfo=UTC), period_end=datetime(2026, 9, 8, tzinfo=UTC))
     assert "Good week" in render(data)
 
 
@@ -621,10 +621,10 @@ async def test_bot_report_is_monospace_and_survives_no_model():
 def test_next_report_slot_is_the_coming_weekday_at_the_hour():  # CC-59
     from app.agent.telegram import next_report_at
 
-    wed = datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)  # a Wednesday, 10:00
-    assert next_report_at(wed, 0, 8) == datetime(2026, 9, 21, 8, 0, tzinfo=timezone.utc)  # next Monday 08:00
-    assert next_report_at(wed, 2, 8) == datetime(2026, 9, 23, 8, 0, tzinfo=timezone.utc)  # today's slot passed: next week
-    assert next_report_at(wed, 2, 12) == datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)  # today's slot still ahead
+    wed = datetime(2026, 9, 16, 10, 0, tzinfo=UTC)  # a Wednesday, 10:00
+    assert next_report_at(wed, 0, 8) == datetime(2026, 9, 21, 8, 0, tzinfo=UTC)  # next Monday 08:00
+    assert next_report_at(wed, 2, 8) == datetime(2026, 9, 23, 8, 0, tzinfo=UTC)  # today's slot passed: next week
+    assert next_report_at(wed, 2, 12) == datetime(2026, 9, 16, 12, 0, tzinfo=UTC)  # today's slot still ahead
 
 
 async def test_weekly_review_sends_itself_on_schedule():  # CC-59
@@ -633,7 +633,7 @@ async def test_weekly_review_sends_itself_on_schedule():  # CC-59
     bot, sent = _bot(pool=pool)
     bot._cfg = _cfg(agent_report_weekday="0", agent_report_hour_utc=8, agent_report_days=7, telegram_chat_id="42,43")
     bot._allowed = {"42", "43"}
-    clock = [datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)]
+    clock = [datetime(2026, 9, 16, 10, 0, tzinfo=UTC)]
     slept: list[float] = []
 
     async def fake_sleep(seconds):
@@ -646,7 +646,7 @@ async def test_weekly_review_sends_itself_on_schedule():  # CC-59
 
     with pytest.raises(asyncio.CancelledError):
         await bot.report_loop(sleep=fake_sleep, now=lambda: clock[0])
-    assert slept[0] == (datetime(2026, 9, 21, 8, 0, tzinfo=timezone.utc) - datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)).total_seconds()
+    assert slept[0] == (datetime(2026, 9, 21, 8, 0, tzinfo=UTC) - datetime(2026, 9, 16, 10, 0, tzinfo=UTC)).total_seconds()
     assert [m["chat_id"] for m in sent] == ["42", "43"]
     assert "INCIDENT REVIEW" in sent[0]["text"] and sent[0]["text"].startswith("<pre>")
 

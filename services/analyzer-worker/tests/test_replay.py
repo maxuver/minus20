@@ -8,6 +8,8 @@ CC-52 An incident with an engineer's verdict replays and is graded against
       identically (the eval set grows from the store, not from fixtures).
 """
 
+from datetime import UTC
+
 from app.config import Settings
 from app.models import IncidentStatus
 from app.replay import SCENARIOS_DIR, load_scenario, run_all
@@ -41,7 +43,7 @@ async def test_replay_respects_budget():  # CC-28
 
 
 async def test_verdict_backed_incident_replays_and_exports(tmp_path):  # CC-52
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.agent.scenario import incident_to_scenario
     from app.replay import export_cases, file_cases, run_cases, scenario_case
@@ -52,7 +54,7 @@ async def test_verdict_backed_incident_replays_and_exports(tmp_path):  # CC-52
         "root_cause": "Image pull issue",
         "verdict": "wrong", "resolution": "NetworkPolicy blocked egress to postgres",
         "context": "## Kubernetes events\nWarning BackOff pod/billing-api-1 restarting\n## Logs\nFATAL: could not connect to postgres:5432\n",
-        "created_at": datetime(2026, 9, 15, 3, 0, tzinfo=timezone.utc),
+        "created_at": datetime(2026, 9, 15, 3, 0, tzinfo=UTC),
     }
     data = incident_to_scenario(row)
     case = scenario_case(data)

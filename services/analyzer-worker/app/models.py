@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
@@ -190,4 +190,4 @@ class Incident(BaseModel):
     # Exactly what the model was shown, after redaction: the audit trail for
     # "what did it see when it said that". Empty when analysis never ran.
     context: str = ""
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

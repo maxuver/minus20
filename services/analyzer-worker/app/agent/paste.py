@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..models import ContextBundle, StreamAlert
 
@@ -88,7 +88,7 @@ def parse_paste(text: str) -> tuple[StreamAlert, ContextBundle]:
     alert = StreamAlert(
         labels=labels,
         annotations={"summary": summary, "description": "Context pasted into the chat, not collected from a cluster."},
-        startsAt=datetime.now(timezone.utc),
+        startsAt=datetime.now(UTC),
         fingerprint="paste-" + hashlib.sha1(joined.encode("utf-8"), usedforsecurity=False).hexdigest()[:12],
     )
     events, metrics, logs = [], [], []

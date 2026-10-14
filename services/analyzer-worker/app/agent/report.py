@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ..ports import BackendError
@@ -135,7 +135,7 @@ def _pct(part: int, whole: int) -> str:
 
 
 async def collect(pool, days: int = 7, now: datetime | None = None) -> ReportData:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     start = now - timedelta(days=max(1, min(int(days), 90)))
     data = ReportData(period_start=start, period_end=now)
     async with pool.acquire() as conn:

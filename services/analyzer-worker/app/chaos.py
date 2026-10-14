@@ -24,7 +24,7 @@ import logging
 import os
 import random
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger("minus20.chaos")
@@ -82,7 +82,7 @@ def pod_manifest(mode: str, name: str, namespace: str) -> dict[str, Any]:
 
 def alert_payload(mode: str, pod: str, namespace: str, now: datetime | None = None) -> dict[str, Any]:
     """The webhook Alertmanager would send for this pod (v4 shape)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     alertname = MODES[mode]["alertname"]
     labels = {"alertname": alertname, "namespace": namespace, "pod": pod, "container": "app", "severity": "critical"}
     if alertname == "KubePodCrashLooping":
@@ -133,7 +133,7 @@ class Chaos:
         # which fault to inject, not anything security-relevant
         mode = mode or random.choice(sorted(MODES))  # nosec B311
         removed = await self.cleanup()
-        name = f"chaos-{mode}-{datetime.now(timezone.utc).strftime('%H%M')}"
+        name = f"chaos-{mode}-{datetime.now(UTC).strftime('%H%M')}"
         await self._api.create_namespaced_pod(self._ns, pod_manifest(mode, name, self._ns))
         logger.info("chaos: removed %d old pod(s), created %s (%s)", removed, name, MODES[mode]["story"])
         deadline = time.monotonic() + self._wait

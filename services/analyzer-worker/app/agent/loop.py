@@ -88,7 +88,7 @@ class Agent:
             answer = await asyncio.wait_for(
                 self._run(question, history or []), timeout=self._cfg.agent_timeout_seconds
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             answer = AgentAnswer(
                 text=f"I ran out of time ({self._cfg.agent_timeout_seconds:.0f}s) before "
                 "reaching an answer. Try a narrower question, or ask again.",

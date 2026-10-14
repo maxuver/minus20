@@ -16,7 +16,7 @@ Real Loki / Prometheus / Kubernetes-events collectors implement the same
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from .config import Settings, settings
 from .models import ContextBundle, StreamAlert
@@ -27,7 +27,7 @@ logger = logging.getLogger("analyzer-worker.collectors")
 
 def _alert_time(alert: StreamAlert) -> datetime:
     """The timestamp to center context collection on."""
-    return alert.startsAt or datetime.now(timezone.utc)
+    return alert.startsAt or datetime.now(UTC)
 
 
 class StubCollector:

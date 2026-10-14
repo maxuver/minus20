@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .correlation import alert_line
 from .models import Incident, IncidentStatus, StreamAlert
@@ -162,8 +162,8 @@ class Analyzer:
         incident.output_tokens = result.output_tokens
         incident.latency_ms = int((time.perf_counter() - started) * 1000)
         if alert.startsAt is not None:
-            fired = alert.startsAt if alert.startsAt.tzinfo else alert.startsAt.replace(tzinfo=timezone.utc)
-            incident.time_to_hypothesis_ms = max(0, int((datetime.now(timezone.utc) - fired).total_seconds() * 1000))
+            fired = alert.startsAt if alert.startsAt.tzinfo else alert.startsAt.replace(tzinfo=UTC)
+            incident.time_to_hypothesis_ms = max(0, int((datetime.now(UTC) - fired).total_seconds() * 1000))
         return await self._finish(incident)
 
     # --- correlation revision (ADR-0006) ------------------------------------

@@ -10,7 +10,7 @@ CC-51  Both are selectable by config and refuse to build without their setting.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -21,7 +21,7 @@ from app.models import StreamAlert
 
 ALERT = StreamAlert(
     labels={"alertname": "KubePodCrashLooping", "namespace": "payments", "pod": "billing-api-1"},
-    startsAt=datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc),
+    startsAt=datetime(2026, 9, 14, 12, 0, tzinfo=UTC),
 )
 
 
