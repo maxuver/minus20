@@ -6,11 +6,39 @@ groupKey/receiver it stamps on before publishing (see ingest-api app/queue.py).
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+APPROVAL_PREFIX = "REQUIRES APPROVAL: "
+
+# Commands and plain-language verbs that change the cluster or its workloads.
+# Read-only checks (get, describe, logs, top, rollout status/history, PromQL)
+# deliberately do not match.
+_DISRUPTIVE = re.compile(
+    r"\b(?:"
+    # global flags may sit between the binary and the verb: kubectl -n payments delete ...
+    r"kubectl(?:\s+-\S+(?:\s+(?!-)\S+)?)*?\s+(?:delete|scale|rollout\s+(?:restart|undo|pause|resume)|apply|patch"
+    r"|edit|drain|cordon|uncordon|taint|replace|set|exec|label|annotate|create|run|cp)"
+    r"|helm(?:\s+-\S+(?:\s+(?!-)\S+)?)*?\s+(?:upgrade|install|uninstall|rollback|delete)"
+    r"|terraform\s+(?:apply|destroy)|systemctl\s+(?:restart|stop|reload)|reboot|rm\s+-rf"
+    r"|drop\s+(?:table|database)|truncate\s+table|delete\s+from"
+    r")\b"
+    r"|^\s*(?:restart|delete|remove|scale|roll\s*back|redeploy|re-deploy|kill|drain|cordon|evict|recreate"
+    r"|increase|decrease|raise|lower|bump|change|update|set|patch|edit|apply|upgrade|downgrade|revert"
+    r"|restore|rotate|recreate|disable|enable)\b",
+    re.IGNORECASE,
+)
+
+
+def mark_if_disruptive(step: str) -> str:
+    """Prefix a next step that would change something with REQUIRES APPROVAL."""
+    if step.strip().upper().startswith(APPROVAL_PREFIX.strip()):
+        return step
+    return APPROVAL_PREFIX + step if _DISRUPTIVE.search(step) else step
 
 
 class StreamAlert(BaseModel):
@@ -93,6 +121,18 @@ class Hypothesis(BaseModel):
     disproof: str = ""
     blast_radius: str = "unknown"
     next_steps: list[str] = Field(default_factory=list)
+
+    @field_validator("next_steps")
+    @classmethod
+    def _mark_disruptive_steps(cls, steps: list[str]) -> list[str]:
+        """A step that changes the cluster is never presented as a casual check.
+
+        The prompt asks the model to mark such steps itself; this is the
+        deterministic net under it, so the property holds for every backend,
+        for paste mode and for correlation revisions alike. At 03:00 an
+        unmarked "restart the pod" reads like a diagnostic and gets run.
+        """
+        return [mark_if_disruptive(s) for s in steps]
 
 
 class LLMResult(BaseModel):

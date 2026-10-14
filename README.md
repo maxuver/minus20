@@ -224,6 +224,11 @@ docs/
 
 ## Development
 
+Using an AI coding agent here, or contributing yourself: read
+[AGENTS.md](AGENTS.md) first. It lists the invariants no change may break
+(the raw alert always arrives, redaction before every model call, read-only,
+measured claims) and how changes are verified.
+
 ```bash
 cd services/analyzer-worker
 pip install -r requirements-dev.txt

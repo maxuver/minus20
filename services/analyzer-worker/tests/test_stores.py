@@ -79,7 +79,7 @@ async def test_postgres_store_creates_schema_then_inserts():  # CC-29
     # history and the UI lose the evidence and the disproof
     assert ["OOMKilling event x3"] in args
     assert "check memory below limit at alert time" in args
-    assert ["raise the limit"] in args
+    assert ["REQUIRES APPROVAL: raise the limit"] in args
     assert len(args) == 23  # …context, alert→hypothesis time, alert summary, storm and correlation bookkeeping
 
 

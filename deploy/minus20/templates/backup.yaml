@@ -1,0 +1,80 @@
+{{- if and (eq .Values.config.store "postgres") .Values.backup.enabled }}
+# Nightly pg_dump of the incident history to its own volume, keeping
+# backup.keepDays days. The history is the product's memory (verdicts, the
+# eval set, the weekly review): losing the Postgres volume should cost one
+# night, not everything. Restore:
+#   kubectl -n <ns> cp <backup-pod>:/backup/<file>.sql.gz ./  (or mount the PVC)
+#   gunzip -c <file>.sql.gz | kubectl -n <ns> exec -i deploy/<release>-postgres -- psql -U <user> -d <db>
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- if .Values.postgres.storageClass }}
+  storageClassName: {{ .Values.postgres.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.storage }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    {{- include "minus20.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false # needs the database, not the Kubernetes API
+          containers:
+            - name: backup
+              image: {{ .Values.postgres.image }}
+              imagePullPolicy: {{ .Values.images.pullPolicy }}
+              command: ["sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  f="/backup/minus20-$(date -u +%Y-%m-%dT%H%M).sql.gz"
+                  pg_dump --no-owner --no-privileges "$MINUS20_POSTGRES_DSN" | gzip -9 > "$f.part"
+                  mv "$f.part" "$f"
+                  find /backup -name 'minus20-*.sql.gz' -mtime +{{ .Values.backup.keepDays }} -delete
+                  echo "backup ok: $(basename "$f") $(du -h "$f" | cut -f1); kept: $(ls /backup | wc -l)"
+              env:
+                - name: MINUS20_POSTGRES_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-postgres-dsn
+                      key: dsn
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-backup
+{{- end }}

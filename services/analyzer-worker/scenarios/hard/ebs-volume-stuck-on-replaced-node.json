@@ -1,7 +1,7 @@
 {
   "name": "ebs-volume-stuck-on-replaced-node",
   "why_hard": "A StatefulSet pod is stuck in ContainerCreating with 'Multi-Attach error' on its volume. The obvious reading is a storage bug or a second pod holding the PVC. There is no second pod: the node the pod used to run on was replaced by the managed node group's rolling update, the EBS volume is still attached to the terminated instance's VolumeAttachment object, and the CSI attacher cannot detach it until that stale VolumeAttachment is gone. The real cause is the node replacement and the orphaned attachment, not the storage class or the application.",
-  "expected_keywords": ["volumeattachment", "attached to", "detach", "old node", "terminated", "replaced", "stale", "node group"],
+  "expected_keywords": ["volumeattachment", "attached to", "detach", "old node", "terminated", "replaced", "node replacement", "stale", "node group"],
   "alert": {
     "status": "firing",
     "labels": {

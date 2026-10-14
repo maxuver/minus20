@@ -52,7 +52,7 @@ def test_analyzed_message_has_every_section():  # CC-36
     assert "Blast radius" in msg and "single-pod" in msg
     assert "Evidence" in msg and "OOMKilling event x3" in msg
     assert "Cheapest way to disprove" in msg
-    assert "Next steps" in msg and "1. Raise the memory limit" in msg
+    assert "Next steps" in msg and "1. REQUIRES APPROVAL: Raise the memory limit" in msg
     assert "ollama" in msg and "1420 ms" in msg
     assert "🔴" in msg  # critical severity icon
 
@@ -134,7 +134,7 @@ def test_slack_blocks_have_every_section():  # CC-40
     assert "Blast radius" in body and "single-pod" in body
     assert "Evidence" in body and "OOMKilling event x3" in body
     assert "Cheapest way to disprove" in body
-    assert "Next steps" in body and "1. Raise the memory limit" in body
+    assert "Next steps" in body and "1. REQUIRES APPROVAL: Raise the memory limit" in body
     assert "ollama" in body and "1420 ms" in body
     assert any(b["type"] == "divider" for b in blocks)
 

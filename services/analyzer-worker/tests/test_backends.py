@@ -63,7 +63,7 @@ def test_parse_hypothesis_handles_code_fences_and_prose():
     text = "Here is my answer:\n```json\n" + GOOD_JSON + "\n```\nHope that helps."
     h = parse_hypothesis(text)
     assert h.root_cause == "container OOMKilled"
-    assert h.next_steps == ["raise memory limit", "check for a leak"]
+    assert h.next_steps == ["REQUIRES APPROVAL: raise memory limit", "check for a leak"]
 
 
 def test_parse_hypothesis_extracts_evidence_disproof_blast_radius():

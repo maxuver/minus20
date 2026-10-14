@@ -34,6 +34,9 @@ SYSTEM_PROMPT = (
     "give the specific signals from the context that support it (evidence), the "
     "single cheapest check that would disprove it (disproof), and its blast radius "
     "(how much breaks if this is the cause): one of single-pod, service, cluster.\n\n"
+    "NEXT STEPS: read-only checks first. Any step that would change the cluster or a "
+    "workload (restart, delete, scale, roll back, apply, patch, raise a limit, edit a "
+    "config) must start with 'REQUIRES APPROVAL: '. The engineer decides.\n\n"
     "Respond with ONLY a JSON object, no prose and no code fences, of the form:\n"
     '{"root_cause": string, "severity": "info"|"warning"|"critical", '
     '"confidence": "low"|"medium"|"high", "evidence": [string, ...], '

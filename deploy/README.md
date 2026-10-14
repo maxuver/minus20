@@ -208,6 +208,36 @@ the other pod. Two model calls for three alerts; the previous cause kept as
 `revised_from`. 130 s from the first alert to the revised hypothesis on the
 local model; a cloud model does the same two calls in about 20 s.
 
+## Running for a year without anyone watching
+
+Two chart features exist so that a cluster nobody looks at still tells you
+when something is wrong, and does not lose its history.
+
+**Dead man's switch.** Every alert Minus20 delivers goes through the cluster
+it runs in, so a dead node or a crash-looping worker looks exactly like a
+quiet night. Set `heartbeat.url` to a check URL from healthchecks.io (free)
+or any service with the same convention:
+
+```bash
+helm upgrade m20 oci://ghcr.io/maxuver/charts/minus20 -n minus20 --reuse-values \
+  --set heartbeat.url=https://hc-ping.com/<your-check-uuid>
+```
+
+Every 10 minutes a Job checks that ingest-api is ready and that an
+analyzer-worker has polled the alert stream within 3 minutes, then pings
+the URL, or `<url>/fail` with the reasons. If the whole server dies, the
+pings stop and the service emails you. It needs no Kubernetes permissions.
+
+**Nightly backup.** On by default whenever the chart runs Postgres
+(`backup.enabled`): `pg_dump` at 03:17 UTC to its own volume, 14 days kept.
+Restore (written, not yet run live; rehearse it on a copy before you need
+it):
+
+```bash
+kubectl -n minus20 run restore --rm -i --image=busybox --overrides='{"spec":{"volumes":[{"name":"b","persistentVolumeClaim":{"claimName":"m20-backup"}}],"containers":[{"name":"restore","image":"busybox","stdin":true,"command":["sh","-c","ls -t /b/*.sql.gz | head -1 | xargs cat"],"volumeMounts":[{"name":"b","mountPath":"/b"}]}]}}' \
+  | gunzip | kubectl -n minus20 exec -i deploy/m20-postgres -- psql -U minus20 -d minus20
+```
+
 ## Unattended: the weekly review sends itself, and a demo that breaks itself
 
 Two knobs make a cluster run for weeks with nobody at the keyboard.

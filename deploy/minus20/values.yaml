@@ -178,3 +178,22 @@ demo:
     # Also run once right after `helm install` / `helm upgrade`, so the first
     # real hypothesis is in the chat a couple of minutes after the install.
     runOnInstall: true
+
+# Nightly pg_dump of the incident history (verdicts, eval set, weekly review)
+# to its own volume, keeping keepDays days. On by default whenever the chart
+# runs Postgres: losing the database volume should cost a night, not the
+# product's memory. Restore steps are in templates/backup.yaml.
+backup:
+  enabled: true
+  schedule: "17 3 * * *"
+  keepDays: 14
+  storage: 1Gi
+
+# Dead man's switch: every run checks that ingest-api is ready and that an
+# analyzer-worker has polled the alert stream recently, then pings this URL
+# (e.g. https://hc-ping.com/<uuid> from healthchecks.io, free), or <url>/fail
+# with the reasons. If the node or the cluster dies, the pings stop and the
+# external service alerts you. Empty = off.
+heartbeat:
+  url: ""
+  schedule: "*/10 * * * *"

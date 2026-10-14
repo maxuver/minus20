@@ -63,6 +63,28 @@ DB_HOST", passes the keyword grader by naming the variable and is still half
 wrong: it calls a symptom the cause. The grader counts it; the reader should
 not.
 
+### 2026-10-14: next steps that change the cluster are marked, and a grader fix
+
+The prompt now asks for read-only checks first and for `REQUIRES APPROVAL: `
+in front of any step that would change the cluster; code applies the same
+mark whatever the model does (`app/models.py`, CC-65), so the guarantee does
+not depend on the prompt. Rerun of the hard set on `qwen2.5:7b`, CPU:
+
+| Scenario | 2026-09-17 | 2026-10-14 (prompt with the approval rule) |
+|---|---|---|
+| 7 original hard scenarios | 5/7 | 5/7, same passes and misses |
+| Spot interruption storm | ❌ | ❌ "Redis connection issues" |
+| Pod Identity denied | ❌ | ❌ "AWS S3 PutObject permission denied" |
+| EBS volume stuck on a replaced node | ✅ "VolumeInUse by terminated instance" | graded ❌, "VolumeInUse error due to node replacement" |
+| **Total, as graded** | **6/10** | **5/10** |
+
+Read by hand, the EBS answer names the real cause: the node was replaced
+and the volume is still in use. The grader missed it because its keywords
+had "replaced" and not "replacement". The keyword list now includes "node
+replacement"; with it the run is 6/10, the same as before, so the approval
+rule cost no accuracy on this set. Both numbers are kept here because the
+fix was made after seeing the result.
+
 ### 2026-09-17: three AWS-shaped scenarios (hard set = 10)
 
 Where the comparison with AWS DevOps Agent will be made is on EKS, so the
