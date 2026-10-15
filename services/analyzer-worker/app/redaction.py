@@ -73,11 +73,56 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
+# Financial identifiers: matched loosely, then confirmed by their checksum, so
+# a long order id or an epoch timestamp is not mistaken for a card or an IBAN.
+# Cards must start with 2-6 (Visa, Mastercard, Amex, Discover, MIR, UnionPay,
+# Maestro); epoch milliseconds start with 1 and are never masked.
+_PAN = re.compile(r"(?<![\w-])[2-6](?:[ -]?\d){12,18}(?![\w-])")
+_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b")
+# Phone numbers in international form (a leading +), the form logs carry.
+_PHONE = re.compile(r"(?<![\w+])\+\d{1,3}[ -]?(?:\(\d{1,4}\)[ -]?)?\d{2,4}(?:[ -]?\d{2,4}){1,4}(?![\w])")
+
+
+def _luhn_ok(digits: str) -> bool:
+    total, parity = 0, len(digits) % 2
+    for i, ch in enumerate(digits):
+        d = int(ch)
+        if i % 2 == parity:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+def _iban_ok(raw: str) -> bool:
+    s = raw.replace(" ", "")
+    if not 15 <= len(s) <= 34:
+        return False
+    moved = s[4:] + s[:4]
+    try:
+        return int("".join(str(int(c, 36)) for c in moved)) % 97 == 1
+    except ValueError:
+        return False
+
+
+def _mask_pan(m: re.Match[str]) -> str:
+    digits = re.sub(r"\D", "", m.group(0))
+    return "[REDACTED_PAN]" if 13 <= len(digits) <= 19 and _luhn_ok(digits) else m.group(0)
+
+
+def _mask_iban(m: re.Match[str]) -> str:
+    return "[REDACTED_IBAN]" if _iban_ok(m.group(0)) else m.group(0)
+
+
 def redact(text: str) -> str:
-    """Mask emails, IPs, tokens, cloud keys and secret-shaped values in `text`."""
+    """Mask emails, IPs, tokens, cloud keys, secret-shaped values, payment card
+    numbers, IBANs and international phone numbers in `text`."""
     for pattern, replacement in _RULES:
         text = pattern.sub(replacement, text)
-    return text
+    text = _IBAN.sub(_mask_iban, text)
+    text = _PAN.sub(_mask_pan, text)
+    return _PHONE.sub("[REDACTED_PHONE]", text)
 
 
 def redact_lines(lines: list[str]) -> list[str]:

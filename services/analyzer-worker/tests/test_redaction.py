@@ -3,6 +3,9 @@
 CC-6  Emails, IPv4, IPv6, bearer tokens, JWTs, AWS keys and secret-shaped
       key=value pairs are all masked.
 CC-8  Redaction is idempotent and preserves surrounding structure.
+CC-67 Payment card numbers (Luhn), IBANs (mod-97) and international phone
+      numbers are masked; numbers that fail the checksum, epoch timestamps,
+      Kubernetes names and digests are not.
 """
 
 import pytest
@@ -127,3 +130,39 @@ def test_redacting_formatter_keeps_the_timestamp():
     out = stream.getvalue()
     assert "[REDACTED_IP]" in out and "10.1.2.3" not in out
     assert "REDACTED_IPV6" not in out  # the asctime survived intact
+
+
+# ---- financial identifiers and phones (CC-67) -----------------------------
+# Test numbers only: published card test PANs and the IBAN examples from the
+# ECBS/SWIFT registry. This file is gitleaks-allowlisted for exactly this.
+
+FINANCIAL_LEAKS = [
+    ("charge failed for card 4111 1111 1111 1111 (declined)", "4111 1111 1111 1111", "[REDACTED_PAN]"),
+    ("pan=5555555555554444 status=401", "5555555555554444", "[REDACTED_PAN]"),
+    ("amex 3782-822463-10005 retried", "3782-822463-10005", "[REDACTED_PAN]"),
+    ("payout to DE89 3704 0044 0532 0130 00 rejected", "DE89 3704 0044 0532 0130 00", "[REDACTED_IBAN]"),
+    ("iban=GB82WEST12345698765432", "GB82WEST12345698765432", "[REDACTED_IBAN]"),
+    ("SMS to +995 555 12 34 56 failed", "+995 555 12 34 56", "[REDACTED_PHONE]"),
+    ("callback +44 20 7946 0958 busy", "+44 20 7946 0958", "[REDACTED_PHONE]"),
+]
+
+NOT_FINANCIAL = [
+    "ts=1758032460123 request handled",          # epoch ms: starts with 1, never a card
+    "order 4111111111111112 not found",           # card-shaped but fails Luhn
+    "ref DE00 1234 5678 9012 3456 78 bad check",  # IBAN-shaped but fails mod-97
+    "pod billing-api-5f8e6c7a9-x1v9c restarted",  # k8s names keep their digits
+    "image sha256:4f6a3193f1219d215727775f9e6b4606",
+    "latency p95 5432 ms over 120000 requests",
+]
+
+
+@pytest.mark.parametrize(("text", "leaked", "mask"), FINANCIAL_LEAKS)
+def test_cards_ibans_and_phones_are_masked(text, leaked, mask):  # CC-67
+    out = redact(text)
+    assert leaked not in out and mask in out
+    assert redact(out) == out  # idempotent
+
+
+@pytest.mark.parametrize("text", NOT_FINANCIAL)
+def test_checksums_keep_ordinary_numbers(text):  # CC-67
+    assert redact(text) == text

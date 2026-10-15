@@ -149,6 +149,18 @@ worth doing, and is the next item.
 - Nothing here has been measured against real production incidents. These
   scenarios were authored for this benchmark, and an author writing their own
   exam is a real limitation.
+- **The hard scenarios carry context the live collectors do not gather yet**
+  (found 2026-10-15). The events collector keeps only the alerting pod's
+  events in its namespace (`app/collectors.py`), and the Prometheus collector
+  runs three fixed per-pod queries. Several hard scenarios rely on signals
+  outside that: node events (`InstanceTerminating`, `NodeNotReady`), the
+  health of a dependency (`redis_up`), rollout history, other pods. So the
+  hard-set score measures reasoning over a context richer than what an
+  installed Minus20 sees today; on a live cluster the same incident can score
+  lower. Collecting the disproving evidence deterministically (node events,
+  dependency health, recent rollouts) is the next accuracy work, and the
+  hard set will be rerun on live-collectable context only, both numbers
+  published.
 
 ## Reproduce
 

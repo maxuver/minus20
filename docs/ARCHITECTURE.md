@@ -87,8 +87,9 @@ written in Go; this is not one.
    (status `correlated`); after a short settle period one revision call over
    all attached contexts replaces the leader's hypothesis, the previous cause
    kept as `revised_from` (ADR-0006). The first hypothesis is never delayed.
-3. **Redaction** masks e-mails, IPs, tokens, cloud keys and secret-shaped
-   values in everything collected. It runs before any model call and has no
+3. **Redaction** masks e-mails, IPs, tokens, cloud keys, secret-shaped
+   values, payment card numbers (Luhn), IBANs (mod-97) and international
+   phone numbers in everything collected. It runs before any model call and has no
    off switch (ADR-0002).
 4. One structured model call produces a hypothesis with evidence, the cheapest
    disproof, blast radius and next steps (ADR-0004). The context is framed as

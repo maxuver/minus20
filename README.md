@@ -1,5 +1,7 @@
 # Minus20
 
+**English** | [Русский](README.ru.md)
+
 **Minus twenty minutes of not knowing.**
 
 An alert tells you *what* broke. It never tells you *why*. The twenty minutes
@@ -8,8 +10,9 @@ Minus20 takes those minutes off every Kubernetes incident: it reacts to the
 Alertmanager webhook, collects what an engineer would gather (Kubernetes
 events, pod logs, Prometheus, Loki, CloudWatch), and puts a falsifiable
 root-cause hypothesis with its evidence in your chat, in under a minute on a
-cloud model and about two on a local one. Inside your cluster; the logs never
-leave.
+cloud model and about two on a local one. It runs inside your cluster; with
+the local model nothing leaves it, and with a hosted model only redacted
+context does.
 
 It never acts on your cluster. It recommends; the engineer decides.
 
@@ -17,7 +20,7 @@ It never acts on your cluster. It recommends; the engineer decides.
 or `kubectl logs` into the bot and get the same message the installed
 product sends after an alert. Owners of any Minus20 bot have this today. A public demo bot runs on a
 small always-on server; opening it to everyone waits on its hosted model
-(see Known limitations).
+(see "Free cloud model tiers" under Known limitations).
 
 ---
 
@@ -68,7 +71,9 @@ in a minute.
 Fastest first hypothesis: add `--set demo.chaos.enabled=true` and the chart
 breaks one pod in its own namespace right after install (under its own
 service account; the product's stays read-only). Measured on a fresh 2 vCPU /
-4 GB server: 35 s from `helm install` to the first hypothesis.
+4 GB server: 35 s from `helm install` to the first analysed alert with the
+offline stub model, image pulls included. A real model adds its own answer
+time: seconds on a hosted model, one to two minutes for a 7B model on CPU.
 
 Or break something yourself and watch it work:
 
@@ -139,8 +144,13 @@ helm upgrade --install m20 deploy/minus20 -n minus20 \
    and the raw alert is delivered even when the model is down. Switch Minus20
    off and you are back to exactly what you had before.
    ([ADR-0003](docs/adr/0003-graceful-degradation.md))
-2. **Your logs never leave without permission.** Non-bypassable PII redaction
-   runs before any model call, and a fully local backend means zero egress.
+2. **Your logs never leave without permission.** Redaction with no off switch
+   runs before every model call. It masks e-mail addresses, IPv4 and IPv6
+   addresses, bearer tokens, JWTs, AWS keys, Telegram bot tokens,
+   secret-shaped `key=value` pairs, payment card numbers (Luhn-checked), IBANs
+   (mod-97-checked) and international phone numbers. Names of people, street
+   addresses and free-text personal data are not detected. A fully local
+   backend means zero egress.
    ([ADR-0002](docs/adr/0002-llm-privacy-and-pluggable-backends.md))
 3. **Cost is a line item, not a surprise.** A deterministic pipeline makes exactly
    one structured LLM call per alert, so the price is known before you switch it
@@ -175,7 +185,7 @@ helm upgrade --install m20 deploy/minus20 -n minus20 \
 | Helm chart with least-privilege RBAC, validated end-to-end on kind | ✅ |
 | Fault-injection scenarios + replay benchmark; the eval set grows from real incidents with an engineer's verdict (`replay --from-store`) | ✅ [results](docs/BENCHMARKS.md) |
 | CI — lint, tests, container build + CVE scan, helm lint, SAST, dependency scan, secret scan of full history, signed provenance + SBOM per image | ✅ |
-| Always-on demo — single-node k3s on a 2 vCPU / 4 GB VPS, SSH by key only, nothing but port 22 reachable | ✅ cold `helm install` from GHCR → first hypothesis in 35 s, 1.3 GB RAM in use (2026-09-27) |
+| Always-on demo — single-node k3s on a 2 vCPU / 4 GB VPS, SSH by key only, nothing but port 22 reachable | ✅ cold `helm install` from GHCR → first analysed alert in 35 s with the stub model, 1.3 GB RAM in use (2026-09-27) |
 | Terraform for AWS EKS | ✅ two real runs (2026-09-13/14): chart from GHCR, Postgres on EBS, MCP, real incidents, destroyed the same session, ~$0.13 each at list price — [proof](docs/EKS-RUN.md) |
 
 ### Known limitations
@@ -188,9 +198,13 @@ Stated plainly, because you will find them anyway:
 - **Accuracy depends on the model, and it is measured.** With the local 7B
   model: 6/6 on plainly-stated scenarios, 6/10 on scenarios built to mislead
   (three of them AWS-specific). With a current cloud model through the same
-  pipeline: 6/6, and every hard scenario it was served, in about 7 s.
+  pipeline: 6/6 on the plain set, and 6 of the 7 original hard scenarios it
+  was served (its free tier never answered the seventh; the three AWS
+  scenarios have not been run on a cloud model yet), in about 7 s.
   Method and case-by-case results: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
-  Nothing has been measured against real production incidents yet.
+  Nothing has been measured against real production incidents yet, and the
+  hard scenarios include signals the live collectors do not gather today
+  (node events, dependency health), so an installed Minus20 can score lower.
 - **Kubernetes only.** No other alert sources yet.
 - **Free cloud model tiers are not a foundation.** In September 2026 one ran
   out of daily quota, one needed plan activation its console could not load,
